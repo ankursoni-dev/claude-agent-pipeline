@@ -19,7 +19,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────
 
 REPO="ankursoni-dev/claude-agent-pipeline"     # <-- CHANGE THIS to your GitHub repo
-BRANCH="main"
+BRANCH="master"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 ARCHIVE_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
 

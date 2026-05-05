@@ -11,7 +11,7 @@ Built for NestJS. Optimized for token efficiency. Works with any NestJS project.
 From the root of your NestJS project:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ankursoni-dev/claude-agent-pipeline/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/ankursoni-dev/claude-agent-pipeline/master/install.sh)
 ```
 
 The script checks for `@nestjs/core` in your `package.json`, backs up any existing `.claude/` directory (asks first), downloads the pipeline, installs Repowise, and updates `.gitignore`. Then open Claude Code and run:
