@@ -43,29 +43,64 @@ def read_input():
 
 def find_relevant_wikis(prompt: str):
     """Return list of (path, content) tuples for wikis whose filename
-    appears as a token in the prompt."""
+    appears as a token in the prompt, plus dependency-matched wikis.
+
+    Two-phase matching:
+      1. Direct match: filename stem appears in prompt
+      2. Dependency match: if a matched wiki lists internal deps, inject those too
+    """
     if not CONTEXT_DIR.exists():
         return []
 
     prompt_lower = prompt.lower()
-    matches = []
+    direct_matches = []
+    matched_paths = set()
 
-    # Scan modules/ and decisions/ for files whose stem appears in the prompt
+    # Phase 1: Direct match — scan modules/ and decisions/ for filename matches
     for sub in ("modules", "decisions"):
         sub_dir = CONTEXT_DIR / sub
         if not sub_dir.exists():
             continue
         for md in sub_dir.glob("*.md"):
+            if md.name.startswith("."):
+                continue  # skip metadata files
             stem = md.stem.lower()
-            # match either the full stem or a primary word from it
             primary_word = re.split(r"[-_]", stem)[0]
             if stem in prompt_lower or (len(primary_word) >= 4 and primary_word in prompt_lower):
                 try:
                     rel = md.relative_to(CONTEXT_DIR.parent.parent)
-                    matches.append((str(rel), md.read_text(encoding="utf-8")))
+                    content = md.read_text(encoding="utf-8")
+                    direct_matches.append((str(rel), content))
+                    matched_paths.add(md)
                 except OSError:
                     pass
-    return matches
+
+    # Phase 2: Dependency match — scan matched wikis for internal module deps
+    dep_matches = []
+    dep_pattern = re.compile(r"(?:Internal|internal)\s*:\s*(.*)", re.MULTILINE)
+    module_name_pattern = re.compile(r"(\w+)(?:Module|Service)")
+
+    for _, content in direct_matches:
+        for dep_line_match in dep_pattern.finditer(content):
+            dep_line = dep_line_match.group(1)
+            for mod_match in module_name_pattern.finditer(dep_line):
+                mod_name = mod_match.group(1).lower()
+                # Look for a wiki matching this dependency
+                modules_dir = CONTEXT_DIR / "modules"
+                if not modules_dir.exists():
+                    continue
+                for candidate in modules_dir.glob("*.md"):
+                    if candidate in matched_paths or candidate.name.startswith("."):
+                        continue
+                    if candidate.stem.lower() == mod_name or candidate.stem.lower() == mod_name.upper():
+                        try:
+                            rel = candidate.relative_to(CONTEXT_DIR.parent.parent)
+                            dep_matches.append((str(rel), candidate.read_text(encoding="utf-8")))
+                            matched_paths.add(candidate)
+                        except OSError:
+                            pass
+
+    return direct_matches + dep_matches
 
 
 def main():

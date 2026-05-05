@@ -14,6 +14,16 @@
     ],
     "UserPromptSubmit": [
       {
+        "_comment": "Risk classification — runs BEFORE ENRICH-PROMPT; injects <risk_tier> tag",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/CLASSIFY-RISK.py"
+          }
+        ]
+      },
+      {
+        "_comment": "Context enrichment — injects relevant wikis + structural summaries based on prompt keywords",
         "hooks": [
           {
             "type": "command",

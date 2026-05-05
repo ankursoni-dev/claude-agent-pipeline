@@ -31,6 +31,7 @@ When the main session delegates a coding task to you:
 4. **Write code AND tests in the same pass.** This is non-negotiable:
    - Every public service method gets a unit test (happy path + each failure branch)
    - Every controller route gets an e2e test asserting status code and response envelope
+   - **Every new endpoint MUST include at least one negative test**: malformed input → 400/422, not-found → 404, or business rule violation → 409/422. This is a blocker-severity rule — the reviewer will reject without it.
    - See `LLD.md` §14 for the test discipline contract
    - Use `Test.createTestingModule()`, mock injected deps, never mock the SUT
 
@@ -57,7 +58,18 @@ Required format:
 ## Open questions or assumptions
 <bullets, or "None">
 
-## Wiki ingredients (for the curator)
+## Wiki ingredients (for the curator) — CONDITIONAL
+Include this section ONLY if:
+- You created a new module
+- You added/changed/removed a public endpoint
+- You changed an exported service signature or token
+- You made an architectural decision worth recording
+
+If NONE of the above apply, replace this entire section with:
+`Wiki: No public surface change.`
+
+When included, use this format:
+
 **Module purpose** (2-3 sentences): <what this module exists for>
 
 **Public API surface** (what other modules can use):
@@ -76,7 +88,7 @@ Required format:
 - <where this module touches other modules — "AuthModule injects X token", or "none">
 ```
 
-The "Wiki ingredients" section is what the curator will use directly, without re-reading source files. Skip it ONLY for changes that don't touch a module's public surface (e.g. a typo fix in an internal helper). For all feature work and most refactors, fill it in.
+The "Wiki ingredients" section is what the curator will use directly, without re-reading source files.
 
 Keep the whole summary to ~50 lines. The diff itself communicates the rest.
 

@@ -31,7 +31,15 @@ Invoke the `AUDITOR` subagent. Pass it:
 
 3. A reminder that the AUDITOR must STOP at Phase 4 (the human gate) and surface the plan for approval. The AUDITOR will not execute code changes — that's your job in Stage C.
 
+4. **If Repowise MCP is available**: Tell the AUDITOR it can use `get_overview()`, `get_risk()`, and `get_context()` for faster module analysis.
+
+5. **If `.claude/context/git-hotspots.json` exists**: Tell the AUDITOR to read it for priority ordering.
+
+6. **If `.claude/audits/baseline.json` exists**: Tell the AUDITOR to use incremental mode — only review modules whose files changed since the baseline SHA. Unchanged modules are carried forward.
+
 The AUDITOR will run Phases 0-3 (setup, module review, concern analysis, plan generation) and then surface the plan to you for human approval.
+
+**Phase 1 change**: The AUDITOR now delegates module-by-module reviews to NESTJS-REVIEWER in audit mode (sonnet) instead of doing them all itself (opus). The AUDITOR will output `## AUDIT-REVIEW REQUEST` blocks that you must execute by invoking NESTJS-REVIEWER with `mode: audit` and feeding the results back to the AUDITOR. This saves ~60% of Phase 1 costs.
 
 ## Stage B — present the plan, gate on approval
 

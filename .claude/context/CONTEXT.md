@@ -25,7 +25,7 @@
 > The curator adds an entry here for each module under `modules/`.
 > Format: `- [name](modules/<name>.md) — one-line purpose`
 
-- [tasks](modules/TASKS.md) — CRUD task management; reference implementation of HTTP envelope conventions and dependency injection pattern
+_(no modules documented yet — the curator will populate this as features ship)_
 
 ## Architectural decisions
 
@@ -36,8 +36,7 @@ _(no ADRs yet)_
 
 ## Key cross-cutting concerns
 
-**Response envelope** — `ResponseInterceptor` (`demo/src/common/interceptors/response.interceptor.ts`) wraps single results in `{ data }` and passes through `{ data, meta }` paginated responses.
-
-**Error envelope** — `HttpExceptionFilter` (`demo/src/common/filters/http-exception.filter.ts`) standardizes all HTTP errors as `{ statusCode, error (machine code), message, timestamp, path, errors? }`. Services can pass UPPER_SNAKE_CASE machine codes via exception body.
-
-**Validation** — Global `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, `transform`; validation failures return 422 with per-field error detail.
+> Fill in as cross-cutting infrastructure is implemented:
+> - **Response envelope** — which interceptor, where it lives
+> - **Error envelope** — which filter, the standard shape
+> - **Validation** — global pipe config, 422 detail format

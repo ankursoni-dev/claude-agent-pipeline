@@ -1,183 +1,127 @@
-# NestJS Multi-Agent `.claude/` Setup
+# NestJS Agent Pipeline
 
-A seven-agent Claude Code architecture specialized for NestJS backend development. Drop this `.claude/` directory at the root of your NestJS project and Claude Code will pick it up.
+A multi-agent Claude Code architecture specialized for NestJS backend development. Drop this `.claude/` directory into any NestJS project and Claude Code picks it up automatically.
 
-## Architecture at a glance
+## Quick Install
 
-```
-                                                     ┌─────────────────┐
-                                                     │  Slash commands │
-                                                     │  /QUICK /MASTER  │
-                                                     │  /AUDIT         │
-                                                     └────────┬────────┘
-                                                              │
-User prompt ───► UserPromptSubmit hook (inject context wikis) ▼
-                          │
-                          ▼
-                Main session  (orchestrator)
-                          │
-        ┌─────────────────┼──────────────────┬──────────────────────┐
-        │                 │                  │                      │
-        ▼                 ▼                  ▼                      ▼
-  STANDARD PIPELINE   FAST PATH        MASTER (opus)          AUDITOR (opus)
-                                                                    │
-                                          ┌─────────────────────────┴────┐
-                                          ▼                              ▼
-                                    AUDIT-REVIEWER × 5-10           standard pipeline
-                                    (opus, parallel waves)          (sonnet/haiku for
-                                                                    execution phase)
+```bash
+# From the root of your NestJS project:
+bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-agent-pipeline/main/install.sh)
+
+# Then open Claude Code and run:
+/INIT
 ```
 
-### The seven agents
+The install script backs up any existing `.claude/`, downloads the pipeline, and installs Repowise. The `/INIT` command inside Claude Code handles Repowise configuration, wiki generation, and validation.
 
-| Tier | Agent | Model | Job |
-|---|---|---|---|
-| Standard | `NESTJS-CODER` | sonnet | writes code + tests |
-| Standard | `NESTJS-REVIEWER` | sonnet | read-only structural review (JSON verdict) |
-| Standard | `NESTJS-TESTER` | haiku | runs tests (bash whitelisted) |
-| Standard | `CONTEXT-CURATOR` | haiku | updates `.claude/context/` wikis |
-| Specialist | `MASTER` | opus | tough problems, design decisions; can request delegation |
-| Specialist | `AUDITOR` | opus | end-to-end audit orchestrator with reports |
-| Specialist | `AUDIT-REVIEWER` | opus | invoked by AUDITOR in parallel waves of 5-10 |
+## Architecture
 
-### The three slash commands
+```
+User prompt
+  ↓ CLASSIFY-RISK.py → <risk_tier> tag (keyword heuristics, zero LLM)
+  ↓ ENRICH-PROMPT.py → inject module wikis + dependency wikis
+  ↓
+Main session (orchestrator)
+  ↓ reads risk tier → routes to flow
+  │
+  ├─ Tier 1 ──► /QUICK flow (coder → typecheck gate → reviewer → conditional tests)
+  ├─ Tier 2 ──► Standard flow (coder → typecheck/lint gate → reviewer → targeted tests → conditional curator)
+  ├─ Tier 3 ──► Full pipeline (coder → gates → reviewer → deep tests → curator → wiki review)
+  ├─ /MASTER ─► MASTER (opus) → delegation requests → user approval
+  └─ /AUDIT ──► AUDITOR (opus) → plan → user approval → execute via standard pipeline → reports
+```
+
+### The agents
+
+| Agent | Model | Job |
+|---|---|---|
+| `NESTJS-CODER` | sonnet | Writes code + tests. Returns structured summary with file list and wiki ingredients. |
+| `NESTJS-REVIEWER` | sonnet | Read-only structural review. Returns JSON verdict. Uses condensed REVIEWER-CHECKLIST. |
+| `NESTJS-TESTER` | haiku | Runs tests at risk-proportional depth (Quick Smoke / Targeted / Deep). Returns JSON. |
+| `CONTEXT-CURATOR` | haiku | Updates `.claude/context/` module wikis. Writes confined by hook. |
+| `MASTER` | opus | Hard problems, design decisions, stalled loops. Can request delegation. Used sparingly. |
+| `AUDITOR` | opus | End-to-end audit. Delegates Phase 1 reviews to sonnet. Plans + reports only; doesn't execute. |
+
+### Slash commands
 
 | Command | Flow |
 |---|---|
-| `/QUICK <task>` (or `quick:` prefix) | Fast path — coder only; reviewer judges if tests/full pipeline needed |
-| `/MASTER <task>` | Invokes MASTER; delegation requests gated by user approval |
-| `/AUDIT [scope]` | Full audit: parallel review → human-approved plan → execute → reports |
+| `/INIT` | First-run setup: validate project, configure Repowise, generate wikis |
+| `/QUICK <task>` | Fast path for trivial changes (renames, config tweaks) |
+| `/MASTER <task>` | Invokes opus-level reasoning; delegation requests gated by user approval |
+| `/AUDIT [scope]` | Full audit: module review → plan → user approval → execute → reports |
 
-## Why this shape
+### Key design principles
 
-- **Specialization where it pays.** Each agent has tools and a system prompt that match its job. The reviewer is *physically* read-only (no Write/Edit tools), so it cannot "fix it itself" and skip the gate.
-- **Cost-aware model selection.** High-judgment work runs on `sonnet` or `opus` (rarely); mechanical work runs on `haiku`. The audit reserves opus for the diagnosis/synthesis phases and uses sonnet/haiku during execution.
-- **Reject-early flow** (`coder → reviewer → tester`, *not* `coder → tester → reviewer`): static review is cheap, tests are expensive.
-- **Hooks for everything deterministic**: context injection, format-on-save, secret-blocking, command whitelisting. LLM tokens are reserved for actual judgment.
-- **Human gates where they matter**: MASTER's delegations and AUDITOR's plan both require user approval. The main session is the bridge.
+- **Risk-based routing**: Tier 1 (trivial) auto-routes to `/QUICK`. Tier 3 (cross-cutting) gets the full pipeline. No wasted tokens on simple renames.
+- **Reject early, reject cheap**: CODE → typecheck gate (free) → REVIEW (sonnet) → TEST (haiku). Static review before expensive tests.
+- **Synthesis mandate**: Every delegation includes explicit file lists, coder summaries, and acceptance criteria. No "find them via Glob."
+- **Context passport**: Compact summary that travels through the pipeline. Each agent gets exactly the context it needs.
+- **Hook-enforced safety**: Reviewer is physically read-only. Tester can only run test commands. Curator can only write to `.claude/context/`. Secrets are blocked. All enforced by `PreToolUse` hooks.
 
 ## File layout
 
 ```
 .claude/
-├── CLAUDE.md                          # Orchestration rules — main session reads this
+├── CLAUDE.md                          # Orchestration rules (main session reads this)
 ├── settings.json                      # Hook wiring
 ├── README.md                          # This file
 │
 ├── agents/
-│   ├── NESTJS-CODER.md                # sonnet — full tools — writes code + tests
-│   ├── NESTJS-REVIEWER.md             # sonnet — READ-ONLY tools — JSON verdict
-│   ├── NESTJS-TESTER.md               # haiku — bash whitelisted to test commands
-│   ├── CONTEXT-CURATOR.md             # haiku — write restricted to .claude/context/
-│   ├── MASTER.md                # opus — generalist for tough work
-│   ├── AUDITOR.md                     # opus — end-to-end audit orchestrator
-│   └── AUDIT-REVIEWER.md              # opus — parallel module reviewer (used by AUDITOR)
+│   ├── NESTJS-CODER.md                # sonnet — writes code + tests
+│   ├── NESTJS-REVIEWER.md             # sonnet — read-only JSON verdict (condensed checklist)
+│   ├── NESTJS-TESTER.md               # haiku — verification ladder (Quick/Targeted/Deep)
+│   ├── CONTEXT-CURATOR.md             # haiku — wiki updates confined to .claude/context/
+│   ├── MASTER.md                      # opus — generalist for tough problems
+│   └── AUDITOR.md                     # opus — audit planner + reporter
 │
-├── commands/                          # Slash commands
-│   ├── QUICK.md                       # /QUICK — fast-path flow
-│   ├── MASTER.md                      # /MASTER — MASTER invocation
-│   └── AUDIT.md                       # /AUDIT — full audit
+├── commands/
+│   ├── INIT.md                        # /INIT — first-run setup
+│   ├── QUICK.md                       # /QUICK — fast-path with typecheck/lint gate
+│   ├── MASTER.md                      # /MASTER — opus invocation
+│   └── AUDIT.md                       # /AUDIT — full audit with incremental support
 │
 ├── skills/
-│   └── nestjs/                        # Loaded by coder + reviewer (and AUDIT-REVIEWER) on demand
+│   └── nestjs/
 │       ├── SKILL.md                   # Router + universal defaults
 │       ├── LLD.md                     # SOLID, DRY, transactions, resilience, tests
 │       ├── API-DESIGN.md              # HTTP method, route, status, envelope, pagination
-│       └── CLI.md                     # `nest g ...`, `nest new`, monorepo
+│       ├── CLI.md                     # nest g, nest new, monorepo
+│       └── REVIEWER-CHECKLIST.md      # Condensed 80-line checklist for reviewer
 │
 ├── hooks/
-│   ├── SEED-SESSION.sh                # SessionStart — orientation injection
-│   ├── ENRICH-PROMPT.py               # UserPromptSubmit — grep wikis, inject matches
-│   ├── BLOCK-SECRETS.py               # PreToolUse Write/Edit — block .env, .git, lockfiles
-│   ├── RESTRICT-BASH-TESTER.py        # PreToolUse Bash — tester can only run test commands
-│   ├── RESTRICT-WRITE-CURATOR.py      # PreToolUse Write/Edit — curator confined to .claude/context/
-│   └── AUTO-FORMAT.sh                 # PostToolUse Write/Edit — prettier + eslint --fix on .ts
+│   ├── SEED-SESSION.sh                # SessionStart — project orientation + Repowise status
+│   ├── CLASSIFY-RISK.py               # UserPromptSubmit — risk tier (1/2/3) classification
+│   ├── ENRICH-PROMPT.py               # UserPromptSubmit — wiki injection + dependency walking
+│   ├── BLOCK-SECRETS.py               # PreToolUse — blocks .env, .git, lockfiles
+│   ├── RESTRICT-BASH-TESTER.py        # PreToolUse — tester can only run test commands
+│   ├── RESTRICT-WRITE-CURATOR.py      # PreToolUse — curator confined to .claude/context/
+│   ├── AUTO-FORMAT.sh                 # PostToolUse — prettier + eslint on .ts files
+│   └── GIT-HOTSPOTS.sh               # On-demand — git churn analysis for audits
 │
 ├── context/
-│   ├── CONTEXT.md                     # Project index — auto-injected on code prompts
-│   ├── modules/                       # Per-module wikis (curator manages)
-│   └── decisions/                     # ADRs (curator manages)
+│   ├── CONTEXT.md                     # Project index (auto-injected on code prompts)
+│   ├── modules/                       # Per-module wikis (curator + Repowise manage)
+│   └── decisions/                     # ADRs
 │
-└── audits/                            # Audit outputs (AUDITOR writes here)
-    └── <YYYY-MM-DD-HHMMSS>/           # Per-audit directory
-        ├── audit-meta.json
-        ├── reviews/                   # Per-module reviews (parallel)
-        ├── concern-analysis/          # Cross-cutting analysis
-        ├── plan.md
-        ├── plan-approved.md
-        ├── execution-log.md
-        └── reports/
-            ├── security.md
-            ├── code.md
-            └── architecture.md
+├── audits/                            # Audit outputs (AUDITOR writes here)
+│   └── baseline.json                  # Incremental audit state (after first audit)
+│
+└── REPOWISE-INTEGRATION.md           # Repowise MCP setup guide
 ```
 
-## Install
+## Repowise Integration (Optional)
 
-```bash
-# from the root of your NestJS project
-unzip claude-nestjs-agents.zip          # produces .claude/
-chmod +x .claude/hooks/*.sh .claude/hooks/*.py
-```
+Repowise provides rich codebase intelligence via MCP: architecture wikis, dependency graphs, risk scores, dead code detection, semantic search. It works with any LLM provider (OpenRouter for cheap, Anthropic for quality, Ollama for free).
 
-That's it. Claude Code reads `.claude/settings.json` automatically on the next session.
+The pipeline works without Repowise — it falls back to keyword-based risk classification and manually-curated wikis. But with Repowise, agents get richer context and the AUDITOR gets data-driven risk scores.
 
-## How to use
-
-### Routine work — just type the task
-
-- *"Implement a `POST /users/:id/avatar` endpoint that uploads to S3."*
-- *"There's a bug in `OrderService.cancel` — refunds aren't being created. Fix it."*
-
-The main session reads `CLAUDE.md`, recognizes a code task, and runs the standard flow (coder → reviewer → tester → curator).
-
-### Small change — use `/QUICK`
-
-- *"/QUICK rename `getUser` to `findUserById` in users service"*
-- *"quick: change the avatar endpoint to use PATCH instead of POST"*
-
-Coder makes the change, reviewer judges if tests/full pipeline are needed, curator updates wiki only if structural.
-
-### Hard problem — use `/MASTER`
-
-- *"/MASTER design the auth module — should we use OAuth2 with PKCE, JWT with refresh rotation, or session cookies?"*
-- *"/MASTER the standard pipeline keeps rejecting my fix for the race condition in OrderService — figure out what's actually wrong"*
-
-MASTER engages with opus-grade reasoning. If it wants to delegate sub-tasks, the main session surfaces the delegation request to you for approval.
-
-### End-to-end audit — use `/AUDIT`
-
-- *"/AUDIT"* — full repo audit
-- *"/AUDIT security only"* — narrowed scope
-- *"/AUDIT module:users"* — single-module deep audit
-
-Six phases:
-1. Setup (timestamp, audit dir)
-2. Parallel module review (5-10 opus reviewers per wave)
-3. Cross-cutting concern analysis (security, transactions, tests, architecture)
-4. **Plan presented to you for approval** ← human gate
-5. Supervised execution via standard pipeline
-6. Final reports (security, code, architecture) — concise, with mermaid diagrams, before/now per change
-
-Outputs live in `.claude/audits/<timestamp>/`. Read `reports/architecture.md` first.
+Setup: run `/INIT` inside Claude Code, or see `REPOWISE-INTEGRATION.md`.
 
 ## Customizing
 
-- **Add a new skill** (e.g. `prisma`, `bullmq`, `swagger`): drop it in `.claude/skills/<name>/SKILL.md`. Reference it from agent frontmatter under `skills:`.
-- **Tighten or loosen hook rules**: edit the corresponding script in `.claude/hooks/`. The patterns in `BLOCK-SECRETS.py` and `RESTRICT-BASH-TESTER.py` are the main knobs.
-- **Different model split**: edit the `model:` field in each agent's frontmatter.
-- **Different language/framework**: replace the `nestjs` skill with one for your stack and rewrite the agent prompts. The orchestration flow itself is framework-agnostic.
-
-## Trade-offs and limits
-
-- **Hook types used**: only `command` (shell scripts). The `prompt` and `agent` hook types from some third-party blog posts are not part of the official spec and are deliberately avoided.
-- **Subagent invocation**: standard agents are invoked via natural-language delegation. The AUDITOR invokes AUDIT-REVIEWERs via the Task tool for parallel execution. MASTER uses a request-and-confirm pattern instead of direct invocation, so the user remains in the loop on cost-significant calls.
-- **The reviewer cannot see runtime behaviour.** It catches structural issues; the tester catches behavioural ones. The flow is designed so both gates exist — neither is sufficient alone.
-- **Loop budgets** are advisory: the main session caps coder↔reviewer at 3 and coder↔tester at 2. Beyond that, escalate to the human. This is enforced by prompt, not by hook.
-- **Skills are advisory, not enforced.** The `skills:` frontmatter is a declaration, not a hard restriction. The `AUDIT-REVIEWER` and `NESTJS-CODER` and `NESTJS-REVIEWER` declare `nestjs`; tester and curator do not. None of them is *physically* prevented from reading any file via Read tool — declaration is the right level of granularity for reference docs.
-- **Audit cost**: a full audit runs many opus subagents. For a 10-module repo, expect 10-15 AUDIT-REVIEWER invocations + 4-6 concern analysis + AUDITOR's own opus reasoning + execution-phase pipeline cost. Run audits deliberately, not on every commit.
-
-## Related references
-
-- NestJS skill (`.claude/skills/nestjs/`) is self-contained and can be used in any project that wants the same code-quality bar, even without the agents.
-- The audit flow's six-phase structure is documented in detail in `.claude/agents/AUDITOR.md`.
+- **Add a new skill**: Drop it in `.claude/skills/<name>/SKILL.md`. Reference from agent frontmatter `skills:`.
+- **Change model assignments**: Edit the `model:` field in agent frontmatter. The cost-quality tradeoff is yours.
+- **Add a new hook**: Add to `.claude/hooks/` and wire in `settings.json`.
+- **Adjust risk tiers**: Edit keyword patterns in `.claude/hooks/CLASSIFY-RISK.py`.
+- **Tune verification depth**: Edit the verification ladder table in `NESTJS-TESTER.md`.

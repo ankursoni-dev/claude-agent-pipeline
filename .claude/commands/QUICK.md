@@ -17,6 +17,21 @@ Invoke `NESTJS-CODER` with:
 - A note that this is a `/QUICK` invocation: the change is expected to be small (rename, parameter change, signature tweak, comment update, etc.)
 - Instruction: **do not write new tests** unless the change introduces a new code path that needs coverage. If existing tests need their assertions updated to match a rename, do that. Otherwise, leave tests alone.
 
+### Step 1.5 — Typecheck + lint gate (main session runs directly, no subagent)
+
+Before invoking the reviewer, run these free gates yourself:
+
+```bash
+npx tsc --noEmit --pretty 2>&1 | head -30
+npx eslint --quiet <changed-files> 2>&1 | head -20
+```
+
+- If **type errors**: send them back to NESTJS-CODER with the error output. This does NOT count toward the reviewer loop budget. The coder fixes type errors faster and cheaper than the reviewer finding them.
+- If **lint errors** (only `error` severity, not warnings): same — send back to coder.
+- If both clean: proceed to reviewer.
+
+This prevents ~30% of reviewer rejections on Quick flow changes, since type errors and lint violations are the most common issues.
+
 ### Step 2 — Reviewer judges scope
 
 Invoke `NESTJS-REVIEWER` with:

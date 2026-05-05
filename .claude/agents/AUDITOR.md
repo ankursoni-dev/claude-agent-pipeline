@@ -24,17 +24,30 @@ Subagent-to-subagent invocation via Task is not supported in the current Claude 
 3. Inside it create `reviews/`, `concern-analysis/`, `reports/` subdirectories.
 4. Write a brief `audit-meta.json` capturing: timestamp, git SHA (or "not a git repo" if absent), branch, NestJS version (from `package.json`), modules discovered, audit scope (full repo / module:X / concern:X).
 
-## Phase 1 — Module review (you do this yourself)
+## Phase 1 — Module review (hybrid: you plan, NESTJS-REVIEWER executes)
 
-You review modules **directly using your own Read/Glob/Grep tools** — there is no parallel sub-agent wave, because subagent-to-subagent Task is not supported. For module-scoped audits (`/AUDIT module:X`) this is one module. For full-repo audits, iterate sequentially.
+Module reviews are now split between you (opus) and NESTJS-REVIEWER (sonnet, audit mode). You plan and orchestrate; the reviewer does the mechanical checklist pass. This saves opus tokens on checklist work while keeping your deep judgment for Phase 2.
+
+**If Repowise MCP is available**: Before starting module reviews, call `get_overview()` to understand the repo architecture and `get_risk()` on each module to prioritize. Start with high-risk modules.
+
+**If git hotspot data is available** (`.claude/context/git-hotspots.json`): Read it and prioritize hotspot modules.
 
 For each module in scope:
 
-1. **Read everything**: the module file, all controllers, services, repositories, DTOs, entities, the corresponding `.spec.ts` files, the wiki at `.claude/context/modules/<name>.md` if it exists, and any cross-references the module uses (other services, tokens, decorators).
+1. **Request the main session to invoke NESTJS-REVIEWER in audit mode.** Output a block like:
 
-2. **Apply the full reviewer checklist** (`.claude/skills/nestjs/LLD.md` §16). Be thorough — you are opus and this is the deep pass.
+```
+## AUDIT-REVIEW REQUEST
+**Module**: <module name>
+**Path**: src/modules/<name>/
+**Files**: <list all .ts files in the module>
+**Mode**: audit
+**Instructions**: Review the entire module using audit-mode checklist. Return expanded JSON with cross_module_concerns and test_coverage_gaps.
+```
 
-3. **Look for things the routine reviewer might miss**:
+The main session will invoke the reviewer and feed the result back to you.
+
+2. **Review the reviewer's output yourself.** Add your opus-level findings that the sonnet reviewer might miss:
    - Subtle LoD violations spanning multiple files
    - Implicit coupling via shared global state
    - Missing transactions in workflows that span service boundaries
@@ -44,7 +57,7 @@ For each module in scope:
    - Resilience gaps: missing timeouts, unbounded retries, missing idempotency keys
    - Performance smells: N+1 queries, sync work in async paths, missing pagination
 
-4. **Write findings to `.claude/audits/<ts>/reviews/<module-name>.md`** using this format:
+3. **Merge the reviewer's findings with your own** and write to `.claude/audits/<ts>/reviews/<module-name>.md` using this format:
 
 ```markdown
 # Audit Review: <module name>
@@ -83,6 +96,32 @@ For each module in scope:
 ```
 
 For multi-module repos, expect each module review to take 30-90 seconds of opus time. If the repo has 30 modules, that's a real cost — surface to the user before starting if scope is wider than they likely intended.
+
+### Incremental audit (when a baseline exists)
+
+If `.claude/audits/baseline.json` exists, read it. It contains the last audit's module verdicts and git SHAs:
+
+```json
+{
+  "timestamp": "...",
+  "git_sha": "...",
+  "modules_reviewed": {
+    "users": { "verdict": "approved", "sha_at_review": "..." },
+    "tasks": { "verdict": "concerns", "sha_at_review": "..." }
+  }
+}
+```
+
+Run `git diff <baseline_sha>..HEAD --name-only` to identify changed files. Only review modules whose files changed since the baseline. Unchanged modules get a "carried forward" status in the review:
+
+```markdown
+# Audit Review: <module name> — CARRIED FORWARD
+Last reviewed: <baseline timestamp>
+Verdict at last review: <approved/concerns>
+Files changed since: 0
+```
+
+After Phase 6 completes, **update `baseline.json`** with the current audit's results. This makes the next audit faster.
 
 ## Phase 2 — Concern analysis (cross-cutting, you do this yourself)
 
@@ -197,7 +236,7 @@ reports under .claude/audits/<ts>/reports/, and produce the final summary.
 
 **Do not execute any plan items yourself.** Do not use Read/Write/Edit/Bash to substitute for what the standard pipeline would do. If you find yourself reasoning "Task isn't available, so I'll just do it myself," stop — that reasoning is the failure mode this restructure prevents. A green test suite is NOT a substitute for the NESTJS-REVIEWER's structural pass on every change.
 
-The reason your tools include Write/Edit at all is for writing review files, plan files, and reports under `.claude/audits/`. Never for source code under `demo/`, `src/`, etc.
+The reason your tools include Write/Edit at all is for writing review files, plan files, and reports under `.claude/audits/`. Never for source code under `src/`, `apps/`, etc.
 
 ## Phase 6 — Reports (re-invoked after execution)
 
