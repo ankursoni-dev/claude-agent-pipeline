@@ -5,10 +5,10 @@ set -euo pipefail
 # NestJS Agent Pipeline — Installer
 #
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/claude-agent-pipeline/main/install.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/ankursoni-dev/claude-agent-pipeline/main/install.sh)
 #
 # Or clone + run:
-#   git clone https://github.com/YOUR_USER/claude-agent-pipeline.git /tmp/cap
+#   git clone https://github.com/ankursoni-dev/claude-agent-pipeline.git /tmp/cap
 #   bash /tmp/cap/install.sh
 #
 # What it does:
@@ -18,7 +18,7 @@ set -euo pipefail
 #   4. Prints next steps
 # ─────────────────────────────────────────────────────────────
 
-REPO="YOUR_USER/claude-agent-pipeline"     # <-- CHANGE THIS to your GitHub repo
+REPO="ankursoni-dev/claude-agent-pipeline"     # <-- CHANGE THIS to your GitHub repo
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 ARCHIVE_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
