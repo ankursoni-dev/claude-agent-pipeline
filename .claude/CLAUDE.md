@@ -144,7 +144,12 @@ Main session
 NESTJS-REVIEWER (reviewing wiki this time)
   ↓ returns JSON verdict
   ↓ if rejected: loop back to curator
-  ↓ if approved: report success to user
+  ↓ if approved: continue
+Main session
+  ↓ REPOWISE SYNC (if Repowise is indexed)
+  ↓ run: repowise update --dry-run → check if changed files need wiki regeneration
+  ↓ if stale: run repowise update → regenerates wiki pages for changed files
+  ↓ report success to user (include Repowise sync result in final report)
 ```
 
 ### Why this order
@@ -364,6 +369,68 @@ Inside the audit's Phase 5, the same budgets apply per-plan-item.
 
 ---
 
+## Repowise wiki sync (post-pipeline)
+
+After every successful pipeline run (tests passed, code shipped), keep Repowise's wiki in sync with the code changes. This is **not optional** if Repowise is indexed — stale wikis poison context for the next task.
+
+### When to sync
+
+- **After every standard pipeline completion** (coder → reviewer → tester → curator done)
+- **After every `/QUICK` completion** that changed code
+- **After audit Phase 5** completes all plan items (once, not per-item)
+- **At session start** if the SEED-SESSION hook reports stale files
+
+### How to sync
+
+```bash
+# Step 1: Check what's stale (zero cost, instant)
+repowise update --dry-run 2>&1
+
+# Step 2: If files are stale, update them (costs ~$0.005 per 5 files with OpenRouter)
+repowise update 2>&1
+```
+
+### What to do with the output
+
+The `repowise update` command outputs which wiki pages it regenerated. **Use this output meaningfully:**
+
+1. **Include in your final report to the user:**
+   ```
+   Repowise: synced 3 wiki pages (users.service.ts, users.controller.ts, create-user.dto.ts)
+   ```
+
+2. **If Repowise update fails** (rate limit, API key expired, network error):
+   - Report to user: "Repowise wiki sync failed: <reason>. The pipeline's `.claude/context/` wikis are still up to date (managed by CONTEXT-CURATOR), but Repowise's richer docs are now stale for the files you just changed."
+   - Do NOT block the pipeline on this failure. The CONTEXT-CURATOR wikis are the baseline; Repowise is the upgrade.
+
+3. **If Repowise update reports unexpected files** (files you didn't change are stale):
+   - This means someone committed outside Claude Code, or a previous sync was interrupted.
+   - Run the full update anyway — it keeps context fresh for future tasks.
+   - Mention it: "Repowise also synced N other stale files from prior commits."
+
+### Session-start sync
+
+The SEED-SESSION hook runs `repowise update --dry-run` and reports stale files. If you see stale files in `<session_orientation>`, run `repowise update` before starting any coding task. The stale files list tells you exactly which modules have outdated context — if the user's task touches those modules, the context the ENRICH-PROMPT hook injects may be wrong.
+
+```bash
+# At session start, if stale files reported:
+repowise update 2>&1
+# Then proceed with the user's task — context is now fresh
+```
+
+### Repowise watch (for active development)
+
+For users doing continuous development, `repowise watch` is better than manual syncs — it auto-updates wiki pages on every file save. Mention this to users during `/INIT`:
+
+```bash
+# Run in a separate terminal alongside Claude Code:
+repowise watch
+```
+
+This replaces the need for post-pipeline `repowise update` calls during the session, since pages are regenerated on save. The session-start staleness check still applies (covers changes made outside the watch window).
+
+---
+
 ## What the main session itself does
 
 - **Reads risk tier** from `<risk_tier>` tag and routes accordingly.
@@ -372,7 +439,8 @@ Inside the audit's Phase 5, the same budgets apply per-plan-item.
 - **Passes explicit file lists** to every downstream agent (Synthesis Mandate).
 - **Tracks loop counts.** Enforce the budget.
 - **Bridges human gates.** Auditor's Phase 4, MASTER's delegation requests.
-- **Aggregates the final report.** What shipped, what tests passed, what wikis updated.
+- **Aggregates the final report.** What shipped, what tests passed, what wikis updated, what Repowise pages synced.
+- **Syncs Repowise** after successful pipeline runs (`repowise update`). Surfaces stale files at session start.
 
 Do NOT:
 - Edit source files yourself when a coder is available.
@@ -411,3 +479,14 @@ Three context sources work together:
 3. **CONTEXT-CURATOR** wikis (`.claude/context/modules/*.md`): Long-term memory maintained by the curator after features ship. The ENRICH-PROMPT hook injects these automatically.
 
 The wikis are the baseline (always available). Repowise is the upgrade (richer, but requires setup). The curator keeps wikis fresh after changes land; Repowise's `watch` or `update` commands keep its index fresh.
+
+### Keeping context fresh — the maintenance contract
+
+| Source | When it updates | Who updates it | Cost |
+|---|---|---|---|
+| CONTEXT-CURATOR wikis | After coder changes public API surface | CONTEXT-CURATOR agent (haiku) | ~$0.002 per wiki |
+| Repowise wiki | After every pipeline run | Main session runs `repowise update` | ~$0.005 per 5 files (OpenRouter) |
+| Repowise wiki (dev mode) | On every file save | `repowise watch` daemon (user starts) | Same per file |
+| Git hotspots | Session start (if >1 day stale) | SEED-SESSION hook (background) | Zero (shell script) |
+
+**If Repowise is indexed, the main session MUST run `repowise update` after every successful pipeline run.** Skipping this causes context drift — the next task will get outdated wikis from ENRICH-PROMPT and stale results from `get_context()`. The cost is negligible (~$0.005 for 5 files on OpenRouter).

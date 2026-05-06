@@ -96,9 +96,9 @@ repowise install-hooks
 
 ## How the Pipeline Uses Repowise
 
-### Standard Flow
+### Querying (during pipeline runs)
 
-The main session can optionally call Repowise tools for richer context:
+The main session and agents can call Repowise MCP tools for richer context at any point:
 
 ```
 User prompt
@@ -107,11 +107,25 @@ User prompt
 Main session
   ↓ [Optional] get_risk(<likely-affected-files>) → more accurate risk tier
   ↓ [Optional] get_context(<module>) → rich module docs for the coder
-  ↓ delegate to NESTJS-CODER (with enriched context)
-  ... rest of pipeline unchanged ...
+  ↓ delegate to {CODER} (with enriched context)
+  ... pipeline runs: coder → reviewer → tester → curator ...
+  ↓ REPOWISE SYNC: repowise update → regenerate wiki pages for changed files
+  ↓ report to user (includes: files synced, any failures)
 ```
 
 Repowise tools are **additive** — they provide better context but the pipeline works without them. If Repowise is unavailable, the keyword-based CLASSIFY-RISK and wiki-based ENRICH-PROMPT are the fallbacks.
+
+### Wiki sync (after pipeline runs)
+
+This is the key integration point — without it, Repowise's wiki drifts from reality:
+
+| When | What runs | Output used for |
+|---|---|---|
+| **Session start** | `repowise update --dry-run` (in SEED-SESSION hook) | Surfaces stale files in `<session_orientation>` so main session knows to run `repowise update` before coding tasks that touch stale modules |
+| **After standard pipeline** | `repowise update` (main session) | Pages regenerated list included in final report to user; confirms context is fresh for the next task |
+| **After `/QUICK`** | `repowise update` (main session) | Same as above |
+| **After audit Phase 5** | `repowise update` once (main session) | Sync output appended to `execution-log.md`; AUDITOR reads it during Phase 6 reports |
+| **During active dev** | `repowise watch` (user runs in terminal) | Auto-syncs on file save; replaces need for manual `repowise update` calls |
 
 ### Audit Flow
 
@@ -122,16 +136,16 @@ The AUDITOR benefits most from Repowise:
 - **Phase 2**: `get_risk()` provides data-driven risk scores; `get_dead_code()` provides graph-based dead code candidates
 - **Phase 3**: `get_why(query)` surfaces architectural decisions from git archaeology
 
-### Context Curator Replacement
+### Context Curator vs Repowise
 
-For projects with Repowise, the CONTEXT-CURATOR's wiki generation can be partially replaced:
+Both coexist. They serve different purposes:
 
-| Wiki Source | When to Use |
-|---|---|
-| Repowise-generated wikis | Available via MCP, richer content, auto-updated |
-| CONTEXT-CURATOR wikis | Fallback when Repowise unavailable; also for ADRs and human-curated decisions |
+| Source | Content | Update mechanism | Fallback? |
+|---|---|---|---|
+| CONTEXT-CURATOR wikis (`.claude/context/`) | Human-curated: module purpose, public API, decisions, integration points | CONTEXT-CURATOR agent (haiku) after public API changes | Yes — always works, even without Repowise |
+| Repowise wikis (`.repowise/`) | Auto-generated: symbol-level docs, dependency graphs, risk scores, dead code | `repowise update` / `repowise watch` | Upgrade — richer but requires setup + LLM API key |
 
-Both can coexist. ENRICH-PROMPT injects `.claude/context/` wikis regardless of Repowise status. Repowise's MCP tools are called on-demand for deeper context.
+ENRICH-PROMPT injects `.claude/context/` wikis regardless of Repowise status. Repowise's MCP tools are called on-demand for deeper context.
 
 ---
 
@@ -192,7 +206,20 @@ model: google/gemini-2.0-flash-001
 - [ ] Initialize: `repowise init --provider openrouter --model google/gemini-2.0-flash-001`
 - [ ] Generate wiki: `repowise generate`
 - [ ] Add MCP server to Claude Code config
-- [ ] Enable auto-updates: `repowise watch .` or post-commit hook
-- [ ] Test MCP tools: `get_overview()`, `get_context("src/modules/tasks")`, `get_risk("src/modules/tasks/tasks.service.ts")`
 - [ ] Update `.gitignore`: add `.repowise/` (contains local DB, not committed)
+- [ ] Test MCP tools: `get_overview()`, `get_context("src/modules/tasks")`, `get_risk("src/modules/tasks/tasks.service.ts")`
 - [ ] Optional: configure backup model in `.repowise/config.yaml`
+
+### Wiki freshness (already wired into the pipeline)
+
+These are handled automatically — no manual setup needed:
+
+- **SEED-SESSION.sh** runs `repowise update --dry-run` at session start, surfaces stale files
+- **CLAUDE.md** instructs main session to run `repowise update` after every successful pipeline run
+- **QUICK.md** includes Repowise sync step in its final report
+- **AUDIT.md** runs `repowise update` once after Phase 5 completes, logs output to execution-log.md
+
+### Optional but recommended
+
+- [ ] Run `repowise watch` in a separate terminal during active development (auto-syncs on file save)
+- [ ] Add a git post-commit hook: `repowise update --since HEAD~1` (catches changes made outside Claude Code)

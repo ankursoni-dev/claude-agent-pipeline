@@ -88,7 +88,20 @@ This takes 1-3 minutes depending on repo size. Tell the user what's happening: "
 After generation, verify it worked:
 ```bash
 ls .repowise/wiki.db && echo "Wiki database created"
+repowise status 2>&1
 ```
+
+Report the status output to the user — it shows page count, index health, and last sync time.
+
+### Optional: Recommend `repowise watch` for active development
+
+Tell the user:
+> "For active development, you can run `repowise watch` in a separate terminal. This auto-updates wiki pages on every file save, so the pipeline always has fresh context. Without it, the pipeline runs `repowise update` after each successful task completion — which works fine but has a slight delay."
+>
+> ```bash
+> # In a separate terminal, alongside Claude Code:
+> repowise watch
+> ```
 
 ## Step 5 — Generate git hotspots
 

@@ -59,6 +59,22 @@ If the change altered:
 
 then invoke `CONTEXT-CURATOR` to update the wiki. Otherwise skip — the wiki need not reflect every rename.
 
+### Step 5 — Repowise sync (if indexed)
+
+If `.repowise/` exists, run:
+
+```bash
+repowise update --dry-run 2>&1
+```
+
+If files are stale:
+
+```bash
+repowise update 2>&1
+```
+
+Include the output in your final report. If the update fails, report the failure but don't block — the CONTEXT-CURATOR wikis are still valid.
+
 ## Final report to user
 
 Keep it tight:
@@ -67,6 +83,7 @@ Keep it tight:
 ✓ Reviewed: <verdict>
 <✓ or skipped>: Tests
 <✓ or skipped>: Wiki update
+<✓ synced N pages / skipped / failed>: Repowise
 ```
 
 ## When NOT to honor `/QUICK`

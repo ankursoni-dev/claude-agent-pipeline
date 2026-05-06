@@ -46,11 +46,20 @@ if git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git -C "$PROJECT_DIR" branch --show-current 2>/dev/null || true)
 fi
 
-# Check for Repowise MCP availability
+# Check for Repowise MCP availability + freshness
 REPOWISE_STATUS=""
+REPOWISE_STALE_FILES=""
+REPOWISE_STALE_COUNT=0
 if command -v repowise >/dev/null 2>&1; then
   if [[ -d "$PROJECT_DIR/.repowise" ]]; then
-    REPOWISE_STATUS="available (indexed)"
+    # Run dry-run update to get precise stale file list (fast, no LLM calls)
+    REPOWISE_STALE_FILES=$(cd "$PROJECT_DIR" && timeout 10s repowise update --dry-run 2>&1 | head -20 || echo "")
+    if [[ -n "$REPOWISE_STALE_FILES" ]] && echo "$REPOWISE_STALE_FILES" | grep -qiE "would (update|regenerate|sync)|stale|changed|modified|out.of.date"; then
+      REPOWISE_STALE_COUNT=$(echo "$REPOWISE_STALE_FILES" | grep -cE "^\s*(- |  |\* )" || echo "some")
+      REPOWISE_STATUS="indexed but STALE — run 'repowise update' before coding tasks that touch these files"
+    else
+      REPOWISE_STATUS="indexed and fresh"
+    fi
   else
     REPOWISE_STATUS="installed but not indexed (run: repowise init)"
   fi
@@ -103,7 +112,11 @@ Each agent loads its framework-specific skill (nestjs or nextjs). Route to the r
 Project conventions and per-module wikis are in .claude/context/.
 ${REPOWISE_STATUS:+
 Repowise MCP: $REPOWISE_STATUS
-  Use get_overview(), get_context(), get_risk() for codebase intelligence.}
+  Query tools: get_overview(), get_context(), get_risk(), search_codebase(), get_why()
+  Maintenance: run 'repowise update' after pipeline completes to keep wiki in sync.}
+${REPOWISE_STALE_FILES:+
+Repowise stale files (need update):
+$REPOWISE_STALE_FILES}
 ${HOTSPOT_STATUS:+Git hotspot data: $HOTSPOT_STATUS (.claude/context/git-hotspots.json)}
 ${BASELINE_STATUS:+Audit baseline: $BASELINE_STATUS (.claude/audits/baseline.json — incremental audits enabled)}
 </session_orientation>

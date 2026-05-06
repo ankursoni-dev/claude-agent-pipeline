@@ -241,6 +241,15 @@ The pipeline works without Repowise — it falls back to keyword-based classific
 
 Setup happens during `/INIT`. Provider options: OpenRouter (cheapest, ~$0.05 to index a 50-file project), Anthropic (highest quality), Ollama (free, local). See `.claude/REPOWISE-INTEGRATION.md` for details.
 
+### Wiki freshness (automatic)
+
+The pipeline keeps Repowise's wiki in sync with code changes — no manual intervention needed:
+
+- **Session start**: `SEED-SESSION.sh` runs `repowise update --dry-run` and surfaces stale files in the session orientation. If modules you're about to work on are stale, the main session runs `repowise update` before starting.
+- **After every pipeline run**: The main session runs `repowise update` and reports which pages were regenerated. Failed syncs are reported but don't block the pipeline.
+- **After audit Phase 5**: A single `repowise update` covers all files changed across all plan items. Output is logged to `execution-log.md`.
+- **Active development**: Run `repowise watch` in a separate terminal for real-time wiki updates on every file save.
+
 ---
 
 ## Token Optimization

@@ -22,12 +22,16 @@ import sys
 
 # Whitelist: each pattern matches the *whole* command (after any leading `cd ... &&`)
 ALLOWED_PATTERNS = [
-    re.compile(r"^(npm|yarn|pnpm)\s+(test|run\s+test\S*|run\s+lint|run\s+typecheck)(\s|$)"),
+    re.compile(r"^(npm|yarn|pnpm)\s+(test|run\s+test\S*|run\s+lint|run\s+typecheck|run\s+build)(\s|$)"),
     re.compile(r"^(npm|yarn|pnpm)\s+exec\s+jest(\s|$)"),
     re.compile(r"^npx\s+jest(\s|$)"),
-    re.compile(r"^node\s+--experimental-vm-modules\s+.*jest"),  # ESM jest setups
-    re.compile(r"^echo\s+"),                                     # debugging echo is fine
-    re.compile(r"^cat\s+.*\.(json|md)$"),                        # reading config files
+    re.compile(r"^npx\s+next\s+build(\s|$)"),                    # Next.js build check
+    re.compile(r"^npx\s+vitest(\s|$)"),                           # Vitest (common in Next.js)
+    re.compile(r"^npx\s+playwright(\s|$)"),                       # Playwright e2e
+    re.compile(r"^npx\s+tsc\s+--noEmit(\s|$)"),                  # typecheck
+    re.compile(r"^node\s+--experimental-vm-modules\s+.*jest"),    # ESM jest setups
+    re.compile(r"^echo\s+"),                                      # debugging echo is fine
+    re.compile(r"^cat\s+.*\.(json|md)$"),                         # reading config files
     re.compile(r"^ls(\s|$)"),
     re.compile(r"^pwd$"),
 ]
@@ -45,9 +49,9 @@ def main():
     except (json.JSONDecodeError, ValueError):
         sys.exit(0)
 
-    # Only fire if this is the tester subagent
+    # Only fire if this is a tester subagent (NestJS or Next.js)
     agent_type = payload.get("agent_type") or ""
-    if agent_type != "NESTJS-TESTER":
+    if agent_type not in ("NESTJS-TESTER", "NEXTJS-TESTER"):
         sys.exit(0)
 
     tool_input = payload.get("tool_input", {})
@@ -70,10 +74,10 @@ def main():
             sys.exit(0)
 
     print(
-        f"BLOCKED: NESTJS-TESTER subagent can only run test commands.\n"
+        f"BLOCKED: Tester subagent can only run test/build/lint commands.\n"
         f"Got: {command}\n"
-        f"Allowed: npm/yarn/pnpm test, npx jest, npm run lint/typecheck.\n"
-        f"If you need a setup step, ask the main session to delegate it to NESTJS-CODER.",
+        f"Allowed: npm/yarn/pnpm test, npx jest/vitest/playwright, npx next build, npx tsc --noEmit.\n"
+        f"If you need a setup step, ask the main session to delegate it to the appropriate CODER agent.",
         file=sys.stderr,
     )
     sys.exit(2)

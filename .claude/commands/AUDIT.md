@@ -73,7 +73,15 @@ Don't pause for user input mid-stream unless:
 - A test failure reveals the plan itself was wrong (surface for re-planning)
 - Scope creep — an item touches unanticipated files
 
-When all items are done, move to Stage D.
+When all items are done:
+
+1. **Repowise sync** (if `.repowise/` exists): Run `repowise update 2>&1` once — this covers all files changed across all plan items. Include the sync output in `execution-log.md`:
+   ```markdown
+   ## Repowise sync — <ISO timestamp>
+   - Pages regenerated: <list from repowise update output>
+   - Status: <success / failed: reason>
+   ```
+2. Move to Stage D.
 
 ## Stage D — re-invoke the AUDITOR for reports
 
