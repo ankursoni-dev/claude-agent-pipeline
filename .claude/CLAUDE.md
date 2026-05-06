@@ -67,7 +67,7 @@ If Repowise is indexed for this project (`.repowise/` directory exists), the fol
 | `get_why(query)` | Architectural decisions + intent from git archaeology |
 | `get_dead_code()` | Unreachable files/symbols with confidence scores |
 
-Repowise wikis are generated using the configured LLM provider (supports OpenRouter for cheap models). They complement the `.claude/context/` wikis maintained by the CONTEXT-CURATOR.
+Repowise wikis are generated using the configured LLM provider (supports Gemini, OpenAI, Anthropic, Ollama). They complement the `.claude/context/` wikis maintained by the CONTEXT-CURATOR.
 
 ---
 
@@ -386,7 +386,7 @@ After every successful pipeline run (tests passed, code shipped), keep Repowise'
 # Step 1: Check what's stale (zero cost, instant)
 repowise update --dry-run 2>&1
 
-# Step 2: If files are stale, update them (costs ~$0.005 per 5 files with OpenRouter)
+# Step 2: If files are stale, update them (costs ~$0.005 per 5 files with Gemini)
 repowise update 2>&1
 ```
 
@@ -485,8 +485,8 @@ The wikis are the baseline (always available). Repowise is the upgrade (richer, 
 | Source | When it updates | Who updates it | Cost |
 |---|---|---|---|
 | CONTEXT-CURATOR wikis | After coder changes public API surface | CONTEXT-CURATOR agent (haiku) | ~$0.002 per wiki |
-| Repowise wiki | After every pipeline run | Main session runs `repowise update` | ~$0.005 per 5 files (OpenRouter) |
+| Repowise wiki | After every pipeline run | Main session runs `repowise update` | ~$0.005 per 5 files (Gemini) |
 | Repowise wiki (dev mode) | On every file save | `repowise watch` daemon (user starts) | Same per file |
 | Git hotspots | Session start (if >1 day stale) | SEED-SESSION hook (background) | Zero (shell script) |
 
-**If Repowise is indexed, the main session MUST run `repowise update` after every successful pipeline run.** Skipping this causes context drift — the next task will get outdated wikis from ENRICH-PROMPT and stale results from `get_context()`. The cost is negligible (~$0.005 for 5 files on OpenRouter).
+**If Repowise is indexed, the main session MUST run `repowise update` after every successful pipeline run.** Skipping this causes context drift — the next task will get outdated wikis from ENRICH-PROMPT and stale results from `get_context()`. The cost is negligible (~$0.005 for 5 files on Gemini).

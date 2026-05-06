@@ -42,26 +42,45 @@ Report any missing hooks.
 Ask the user:
 > "Repowise provides rich codebase intelligence (architecture wikis, risk scores, dead code detection) via MCP. It works best with an LLM API key."
 >
-> "Do you want to set up Repowise now?"
-> - Yes, with OpenRouter (cheapest — uses models like Gemini Flash at ~$0.075/M tokens)
-> - Yes, with Anthropic API (uses Claude — higher quality, higher cost)
-> - Yes, with Ollama (local — zero API cost, needs local GPU)
-> - Skip for now (the pipeline works without it; you can set it up later)
+> "Which provider do you want to use?"
+> 1. **Gemini** (recommended — cheapest, fast, free tier available)
+> 2. **OpenAI** (good quality, moderate cost)
+> 3. **Anthropic** (highest quality, higher cost)
+> 4. **Ollama** (local — zero API cost, needs local GPU)
+> 5. **Skip for now** (the pipeline works without it; you can set it up later)
 
 Based on their choice:
 
-### OpenRouter
+### Gemini
 ```bash
 # Check for key
-grep -q OPENROUTER_API_KEY .env 2>/dev/null && source <(grep OPENROUTER_API_KEY .env)
+if [ -z "$GEMINI_API_KEY" ]; then
+  echo "Get your Gemini API key at: https://aistudio.google.com/apikey"
+  # Ask user to provide it
+fi
 
-# If no key found, ask user to provide it
-# Then initialize
-repowise init --provider openrouter --model google/gemini-2.0-flash-001
+repowise init --provider gemini --model gemini-2.0-flash
+```
+
+### OpenAI
+```bash
+# Check for key
+if [ -z "$OPENAI_API_KEY" ]; then
+  echo "Get your OpenAI API key at: https://platform.openai.com/api-keys"
+  # Ask user to provide it
+fi
+
+repowise init --provider openai --model gpt-4.1-mini
 ```
 
 ### Anthropic
 ```bash
+# Check for key
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+  echo "Get your Anthropic API key at: https://console.anthropic.com/settings/keys"
+  # Ask user to provide it
+fi
+
 repowise init --provider anthropic --model claude-sonnet-4-6
 ```
 
@@ -69,7 +88,7 @@ repowise init --provider anthropic --model claude-sonnet-4-6
 ```bash
 # Check Ollama is running
 curl -s http://localhost:11434/api/tags >/dev/null 2>&1 || echo "Ollama doesn't seem to be running"
-repowise init --provider ollama --model llama3.1:8b
+repowise init --provider ollama --model llama3.2
 ```
 
 ### Skip
@@ -121,7 +140,7 @@ Check that `.gitignore` includes these entries. Add any that are missing:
 
 ```
 .repowise/
-.claude/openrouter-status.json
+.claude/repowise-status.json
 .claude/context/git-hotspots.json
 .claude/audits/
 ```

@@ -239,7 +239,7 @@ Repowise adds rich codebase intelligence via MCP: architecture wikis, dependency
 
 The pipeline works without Repowise — it falls back to keyword-based classification and manually curated wikis. With Repowise, agents get richer context and the AUDITOR gets data-driven analysis.
 
-Setup happens during `/INIT`. Provider options: OpenRouter (cheapest, ~$0.05 to index a 50-file project), Anthropic (highest quality), Ollama (free, local). See `.claude/REPOWISE-INTEGRATION.md` for details.
+Setup happens during `/INIT`. Provider options: Gemini (cheapest, free tier available), OpenAI, Anthropic (highest quality), Ollama (free, local). See `.claude/REPOWISE-INTEGRATION.md` for details.
 
 ### Wiki freshness (automatic)
 

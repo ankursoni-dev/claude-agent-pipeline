@@ -8,14 +8,14 @@
 
 ## Why Repowise Instead of Custom Scripts
 
-The original plan was to build a custom intelligence layer (openrouter_client.py, wiki_builder.py, etc.) that reimplemented Repowise patterns. After inspecting the Repowise source code, it became clear that Repowise already provides everything we need:
+The original plan was to build a custom intelligence layer that reimplemented Repowise patterns. After inspecting the Repowise source code, it became clear that Repowise already provides everything we need:
 
 | Feature | Custom Scripts | Repowise |
 |---|---|---|
 | Wiki generation | Basic module wikis | 8-level hierarchical wikis (file, symbol, module, architecture) |
 | Dependency graph | Regex-based import parsing | Tree-sitter AST + PageRank + betweenness centrality |
 | NestJS support | Manual decorator parsing | Auto-detects @Module, @Controller, @Injectable decorators |
-| LLM provider | Custom OpenRouter client | Native OpenRouter, Anthropic, OpenAI, Gemini, Ollama support |
+| LLM provider | Custom client | Native Gemini, OpenAI, Anthropic, Ollama support |
 | Auto-updates | Manual freshness checking | `repowise watch` (file watcher) + `repowise update` (git diff) |
 | Dead code | Shell script grep | Graph-based: unreachable files, unused exports, confidence scoring |
 | Risk assessment | Keyword heuristics | Git churn + dependents + bus factor + co-change analysis |
@@ -38,12 +38,20 @@ uv tool install repowise
 ```bash
 cd <project-root>
 
-# Using OpenRouter (cheapest option — uses your existing key):
-export OPENROUTER_API_KEY="sk-..."  # from your .env
-repowise init --provider openrouter --model google/gemini-2.0-flash-001
+# Using Gemini (cheapest option — free tier available):
+export GEMINI_API_KEY="..."  # from https://aistudio.google.com/apikey
+repowise init --provider gemini --model gemini-2.0-flash
 
-# Or using a local model via Ollama (zero API cost):
-# repowise init --provider ollama --model llama3.1:8b
+# Or using OpenAI:
+# export OPENAI_API_KEY="sk-..."
+# repowise init --provider openai --model gpt-4.1-mini
+
+# Or using Anthropic (highest quality):
+# export ANTHROPIC_API_KEY="sk-ant-..."
+# repowise init --provider anthropic --model claude-sonnet-4-6
+
+# Or using Ollama (zero API cost, local):
+# repowise init --provider ollama --model llama3.2
 ```
 
 This creates `.repowise/` with SQLite DB, LanceDB vector index, and config.
@@ -54,7 +62,7 @@ This creates `.repowise/` with SQLite DB, LanceDB vector index, and config.
 repowise generate  # Full wiki generation for the whole repo
 ```
 
-This analyzes the codebase using tree-sitter, builds the dependency graph, and generates wiki pages using the configured LLM provider. For a ~50 file NestJS project with OpenRouter Gemini Flash, this costs ~$0.05 and takes ~2 minutes.
+This analyzes the codebase using tree-sitter, builds the dependency graph, and generates wiki pages using the configured LLM provider. For a ~50 file project with Gemini Flash, this costs ~$0.05 and takes ~2 minutes.
 
 ### 4. Start the MCP server
 
@@ -151,11 +159,11 @@ ENRICH-PROMPT injects `.claude/context/` wikis regardless of Repowise status. Re
 
 ## Cost Profile
 
-### With OpenRouter (google/gemini-2.0-flash-001)
+### With Gemini (gemini-2.0-flash)
 
 | Operation | Tokens | Cost |
 |---|---|---|
-| Initial `repowise generate` (50 files) | ~500K | ~$0.05 |
+| Initial `repowise generate` (50 files) | ~500K | ~$0.05 (free tier may cover this) |
 | `repowise update` (5 changed files) | ~50K | ~$0.005 |
 | `get_context()` per call | ~2K output | ~$0.0002 |
 | `get_risk()` per call | ~1K output | ~$0.0001 |
@@ -172,17 +180,20 @@ The pipeline improvements (condensed reviewer checklist, explicit file lists, ty
 
 ## Model Recommendations for Repowise
 
+Repowise v0.2.3 supports four providers: **gemini**, **openai**, **anthropic**, and **ollama**.
+
 | Model | Provider | Cost | Quality | Best For |
 |---|---|---|---|---|
-| `google/gemini-2.0-flash-001` | OpenRouter | ~$0.075/M input | Good for docs | Default choice — fast, cheap, reliable |
-| `deepseek/deepseek-chat-v3-0324` | OpenRouter | ~$0.14/M input | Good for code | Fallback if Gemini is down |
-| `anthropic/claude-haiku-4-5` | OpenRouter | ~$0.80/M input | Highest quality | When you want the best wikis (still cheaper than direct Anthropic) |
-| `llama3.1:8b` | Ollama (local) | $0.00 | Acceptable | Zero-cost option if you have GPU |
+| `gemini-2.0-flash` | Gemini | Free tier / ~$0.075/M | Good for docs | Default choice — fast, cheapest, reliable |
+| `gemini-3.1-flash-lite-preview` | Gemini | Free tier / ~$0.02/M | Acceptable | Ultra-cheap option |
+| `gpt-4.1-mini` | OpenAI | ~$0.40/M input | Good for code | Solid alternative to Gemini |
+| `claude-sonnet-4-6` | Anthropic | ~$3.00/M input | Highest quality | When you want the best wikis |
+| `llama3.2` | Ollama (local) | $0.00 | Acceptable | Zero-cost option if you have GPU |
 
 Configure in `.repowise/config.yaml`:
 ```yaml
-provider: openrouter
-model: google/gemini-2.0-flash-001
+provider: gemini
+model: gemini-2.0-flash
 ```
 
 ---
@@ -202,8 +213,8 @@ model: google/gemini-2.0-flash-001
 
 ## Implementation Checklist
 
-- [ ] Install Repowise: `pip install repowise` or `uv tool install repowise`
-- [ ] Initialize: `repowise init --provider openrouter --model google/gemini-2.0-flash-001`
+- [ ] Install Repowise: `pip install repowise` or `pipx install repowise`
+- [ ] Initialize: `repowise init --provider gemini --model gemini-2.0-flash` (or openai/anthropic/ollama)
 - [ ] Generate wiki: `repowise generate`
 - [ ] Add MCP server to Claude Code config
 - [ ] Update `.gitignore`: add `.repowise/` (contains local DB, not committed)

@@ -162,7 +162,7 @@ fi
 if [[ -f ".gitignore" ]]; then
     ADDITIONS=""
     grep -qxF ".repowise/" .gitignore 2>/dev/null || ADDITIONS+=".repowise/"$'\n'
-    grep -qxF ".claude/openrouter-status.json" .gitignore 2>/dev/null || ADDITIONS+=".claude/openrouter-status.json"$'\n'
+    grep -qxF ".claude/repowise-status.json" .gitignore 2>/dev/null || ADDITIONS+=".claude/repowise-status.json"$'\n'
     grep -qxF ".claude/context/git-hotspots.json" .gitignore 2>/dev/null || ADDITIONS+=".claude/context/git-hotspots.json"$'\n'
     grep -qxF ".claude/audits/" .gitignore 2>/dev/null || ADDITIONS+=".claude/audits/"$'\n'
 

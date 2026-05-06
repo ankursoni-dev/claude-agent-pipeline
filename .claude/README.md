@@ -125,7 +125,7 @@ Main session (orchestrator)
 
 ## Repowise Integration (Optional)
 
-Repowise provides rich codebase intelligence via MCP: architecture wikis, dependency graphs, risk scores, dead code detection, semantic search. It works with any LLM provider (OpenRouter for cheap, Anthropic for quality, Ollama for free).
+Repowise provides rich codebase intelligence via MCP: architecture wikis, dependency graphs, risk scores, dead code detection, semantic search. It works with any LLM provider (Gemini for cheap, Anthropic for quality, Ollama for free).
 
 The pipeline works without Repowise — it falls back to keyword-based risk classification and manually-curated wikis. But with Repowise, agents get richer context and the AUDITOR gets data-driven risk scores.
 
