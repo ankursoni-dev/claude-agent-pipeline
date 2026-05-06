@@ -109,8 +109,33 @@ If your changes touch `main.ts` or anything in the app bootstrap, before returni
 - `app.use(helmet())`
 - `app.enableCors({ origin, credentials })`
 - `app.enableVersioning({ type: VersioningType.URI })`
+- **Swagger setup**: `SwaggerModule.setup('api/docs', app, document)` with `DocumentBuilder` configured (title: 'Utsavs API', version from package.json). This is non-optional.
 
 If any are missing, add them. The skill's universal defaults section specifies these — they are not optional.
+
+## Swagger / OpenAPI — mandatory
+
+Every controller method MUST have Swagger decorators. This is blocker-severity — same weight as missing tests:
+
+- `@ApiTags('module-name')` on the controller class
+- `@ApiOperation({ summary: '...' })` on every route handler
+- `@ApiResponse({ status, description, type })` for success AND error responses (at minimum 200/201 + 400 + 404 as applicable)
+- DTOs: every field decorated with `@ApiProperty({ description, example, required? })`
+
+If `@nestjs/swagger` is not installed, surface the need in your summary — the main session will approve the install.
+
+## Docker awareness
+
+All code must work inside a Docker container. This means:
+
+- Database URLs come from `process.env.DATABASE_URL` (resolves to Docker service `postgres`, not `localhost`)
+- Redis URLs come from `process.env.REDIS_URL` (resolves to Docker service `redis`)
+- Never hardcode `localhost` for any service dependency
+- If you need a new service (e.g., a message queue, S3 mock), surface it — do NOT assume it's available
+
+## Prettier compliance
+
+Code must conform to the project `.prettierrc` (singleQuote, trailingComma: all, printWidth: 100). The AUTO-FORMAT hook runs after your edits, but verify your output matches before returning.
 
 ## When to push back
 

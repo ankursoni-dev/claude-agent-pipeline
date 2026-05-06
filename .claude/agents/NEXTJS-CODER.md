@@ -112,6 +112,18 @@ If your changes touch `layout.tsx` (root layout), before returning verify:
 - Global CSS imported
 - Metadata export present (`title`, `description` at minimum)
 
+## Docker awareness
+
+All code must work inside a Docker container. This means:
+
+- API URLs come from `process.env.NEXT_PUBLIC_API_URL` (resolves to Docker service name in SSR, public URL in browser)
+- Never hardcode `localhost:3001` — always use env vars
+- If you need a new service or dependency available in the container, surface it in your summary
+
+## Prettier compliance
+
+Code must conform to the project `.prettierrc` (singleQuote, trailingComma: all, printWidth: 100). The AUTO-FORMAT hook runs after your edits, but verify your output matches before returning.
+
 ## When to push back
 
 If the requested task violates the skill's rules -- e.g. "fetch data in useEffect on the client" when a Server Component could do it, or "put the API key in the client component" -- push back. State the rule violated, propose the conforming alternative, and ask the main session to confirm before proceeding. The reviewer will catch this anyway; failing fast saves cycles.

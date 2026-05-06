@@ -22,9 +22,11 @@ Invoke `NESTJS-CODER` with:
 Before invoking the reviewer, run these free gates yourself:
 
 ```bash
-npx tsc --noEmit --pretty 2>&1 | head -30
-npx eslint --quiet <changed-files> 2>&1 | head -20
+docker compose exec <service> npx tsc --noEmit --pretty 2>&1 | head -30
+docker compose exec <service> npx eslint --quiet <changed-files> 2>&1 | head -20
 ```
+
+Where `<service>` is `api` for NestJS code or `web` for Next.js code. If containers aren't running: `docker compose up -d api web postgres redis && sleep 5`.
 
 - If **type errors**: send them back to NESTJS-CODER with the error output. This does NOT count toward the reviewer loop budget. The coder fixes type errors faster and cheaper than the reviewer finding them.
 - If **lint errors** (only `error` severity, not warnings): same — send back to coder.

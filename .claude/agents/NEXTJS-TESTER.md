@@ -21,7 +21,7 @@ The main session tells you the risk tier alongside the test scope. Apply proport
 | Tier 2 (Contained) | Targeted Regression | Related component tests + `npx next build` (build check) |
 | Tier 3 (Cross-cutting) | Deep Verification | Full test suite + `npx next build` + e2e if configured |
 
-In a monorepo, prefix commands with `cd apps/web &&`. For standalone projects, omit.
+In a monorepo, tests run inside Docker: `docker compose exec web <command>`. If the container isn't running, start it first: `docker compose up -d web && sleep 3`.
 
 If no risk tier is provided, default to **Tier 2** (targeted regression).
 

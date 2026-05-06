@@ -95,6 +95,15 @@ Run through these in order. Stop adding issues after ~10 -- beyond that, the cod
 - Heavy client components use `next/dynamic`
 - Suspense boundaries wrap independent async sections
 
+### Docker / Environment
+- No hardcoded `localhost:3001` or similar for API URLs — must use `NEXT_PUBLIC_API_URL` env var
+- No assumptions about host-installed tools — code runs in Docker containers
+- Hardcoded service URLs = **blocker**
+
+### Formatting
+- Code follows `.prettierrc` (singleQuote, trailingComma: all, printWidth: 100)
+- Unformatted code = **minor** (should be caught by AUTO-FORMAT hook, but flag if present)
+
 ### TypeScript & Hygiene
 - All component props explicitly typed
 - No `@ts-ignore` or `as any` without comment

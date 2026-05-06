@@ -16,11 +16,53 @@ This pipeline supports monorepo projects with multiple frameworks. The coder and
 
 When delegating to the coder, include which part of the monorepo the task targets. For cross-stack tasks (e.g., "add a users page that calls the users API"), split into separate delegations or let the coder handle both in sequence.
 
-### Typecheck/lint gates in monorepo
+### Typecheck/lint gates in monorepo (run inside Docker)
 
-For NestJS code: `cd apps/api && npx tsc --noEmit --pretty 2>&1 | head -30`
-For Next.js code: `cd apps/web && npx next build --dry-run 2>&1 | head -30` (or `npx tsc --noEmit`)
-For shared packages: `cd packages/<name> && npx tsc --noEmit`
+For NestJS code: `docker compose exec api npx tsc --noEmit --pretty 2>&1 | head -30`
+For Next.js code: `docker compose exec web npx tsc --noEmit --pretty 2>&1 | head -30`
+For shared packages: `docker compose exec api npx tsc --noEmit -p packages/<name>/tsconfig.json`
+For lint: `docker compose exec <service> npx eslint --quiet <changed-files> 2>&1 | head -20`
+
+If containers are not running: `docker compose up -d api web postgres redis && sleep 5` before running gates.
+
+---
+
+## Project-wide standards — enforced at every pipeline step
+
+These three standards are **non-negotiable** across all agents. The main session enforces them as gates; the coder must produce compliant code; the reviewer must check for compliance; the tester must verify.
+
+### 1. Prettier formatting
+
+A `.prettierrc` exists at the monorepo root. All TypeScript/TSX code MUST be prettier-formatted.
+
+- **Coder**: Run `npx prettier --check <changed-files>` before returning. If it fails, fix it.
+- **Reviewer**: Flag unformatted code as `minor` severity (it should never reach you — the AUTO-FORMAT hook runs post-edit — but catch it if it does).
+- **Tester**: Not responsible for formatting checks.
+- **Main session gate**: The AUTO-FORMAT.sh PostToolUse hook runs prettier + eslint --fix automatically after every file edit. If the coder's output is still not formatted, send it back before invoking the reviewer.
+- **Settings**: `singleQuote: true`, `trailingComma: 'all'`, `printWidth: 100`, `semi: true`, `tabWidth: 2`.
+
+### 2. OpenAPI / Swagger documentation
+
+Every NestJS API endpoint MUST be documented with Swagger decorators. The API docs are served at `/api/docs` via `@nestjs/swagger`.
+
+- **Coder (NestJS)**: Every controller method must have `@ApiOperation()`, `@ApiResponse()` (success + error), and `@ApiTags()` at the controller level. DTOs must use `@ApiProperty()` on every field. This is **blocker-severity** — same as missing tests.
+- **Reviewer (NestJS)**: Check for Swagger decorators on every endpoint. Missing `@ApiOperation` or `@ApiResponse` on a public endpoint = `blocker`. Missing `@ApiProperty` on a DTO field = `major`.
+- **Tester (NestJS)**: At Tier 2+ verification, include a Swagger doc validation check: `curl -sf http://localhost:3001/api/docs-json | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{len(d[\"paths\"])} paths documented')"` (run inside the api container).
+- **Bootstrap**: `main.ts` must set up SwaggerModule with title "Utsavs API", version from package.json, and serve at `/api/docs`.
+- **Coder (Next.js)**: Not applicable (frontend has no Swagger). But if the Next.js coder creates Route Handlers (`app/api/`), they should have JSDoc comments describing the endpoint contract.
+
+### 3. Docker-first development
+
+All development runs inside Docker containers. No `pnpm dev` or `npm run dev` on the host.
+
+- **Coder**: Never assume tools/services are available on the host. Code must work inside the Docker container. Database URLs use Docker service names (`postgres`, `redis`), not `localhost`. If a new service dependency is needed (e.g., a message queue), surface it — the main session will add it to `compose.yaml`.
+- **Reviewer**: Flag any hardcoded `localhost` database/redis URLs as `blocker` — they must use environment variables that resolve to Docker service names. Flag any instructions to "run `npm install` locally" as `major`.
+- **Tester**: Tests run inside the Docker container. Use `docker compose exec api <command>` for NestJS tests, `docker compose exec web <command>` for Next.js tests. If the container isn't running, start it first: `docker compose up -d api postgres redis`.
+- **Main session gates**: Replace bare typecheck/lint commands with Docker-exec equivalents:
+  - NestJS: `docker compose exec api npx tsc --noEmit --pretty 2>&1 | head -30`
+  - Next.js: `docker compose exec web npx tsc --noEmit --pretty 2>&1 | head -30`
+  - Lint: `docker compose exec <service> npx eslint --quiet <changed-files> 2>&1 | head -20`
+- **Exceptions**: The AUTO-FORMAT.sh hook runs on the host (it's a PostToolUse hook). This is fine — prettier/eslint formatting doesn't need Docker. File edits by the coder also happen on the host (volume-mounted). Only test/build/typecheck commands must run inside containers.
 
 ---
 
@@ -119,8 +161,8 @@ Main session (you)
 {CODER}
   ↓ returns: file list + summary + tests added
 Main session
-  ↓ TYPECHECK GATE: run in the appropriate app directory (see "Monorepo awareness" above)
-  ↓ LINT GATE: run `npx eslint --quiet <changed-files> 2>&1 | head -20`
+  ↓ TYPECHECK GATE: run inside Docker (see "Monorepo awareness" above)
+  ↓ LINT GATE: `docker compose exec <service> npx eslint --quiet <changed-files> 2>&1 | head -20`
   ↓ if errors: return to CODER (does NOT count toward reviewer loop budget)
   ↓ if clean: build explicit file list from coder output
   ↓ delegate: "Use {REVIEWER} to review files: [explicit list]"

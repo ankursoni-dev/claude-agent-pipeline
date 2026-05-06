@@ -94,6 +94,22 @@ Run through these in order. Stop adding issues to your list after ~10 — beyond
 - Tests mock injected deps, not the SUT
 - No test that asserts implementation details (private method calls, exact SQL)
 
+### Swagger / OpenAPI
+- Every controller class has `@ApiTags()`
+- Every route handler has `@ApiOperation({ summary })` and `@ApiResponse()` for success + error codes
+- Every DTO field has `@ApiProperty({ description, example })`
+- Missing `@ApiOperation` or `@ApiResponse` on a public endpoint = **blocker**
+- Missing `@ApiProperty` on a DTO field = **major**
+
+### Docker / Environment
+- No hardcoded `localhost` for database, redis, or any service URL — must use env vars
+- No assumptions about host-installed tools — code runs in Docker containers
+- Hardcoded `localhost:5432` or `localhost:6379` = **blocker**
+
+### Formatting
+- Code follows `.prettierrc` (singleQuote, trailingComma: all, printWidth: 100)
+- Unformatted code = **minor** (should be caught by AUTO-FORMAT hook, but flag if present)
+
 ### Hygiene
 - No `// @ts-ignore`, no `as any` without comment
 - No empty catch blocks

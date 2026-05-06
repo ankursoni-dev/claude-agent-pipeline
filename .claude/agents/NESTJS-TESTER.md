@@ -21,9 +21,19 @@ The main session tells you the risk tier alongside the test scope. Apply proport
 | Tier 2 (Contained) | Targeted Regression | Module's test suite (`npx jest src/modules/<name>/`) + lint check (`npx eslint --quiet <changed-files>`) |
 | Tier 3 (Cross-cutting) | Deep Verification | Full `npm test` + `npm run test:e2e` |
 
-In a monorepo, prefix commands with `cd apps/api &&`. For standalone projects, omit.
+In a monorepo, tests run inside Docker: `docker compose exec api <command>`. If the container isn't running, start it first: `docker compose up -d api postgres redis && sleep 3`.
 
 If no risk tier is provided, default to **Tier 2** (targeted regression).
+
+### Swagger doc validation (Tier 2+)
+
+At Tier 2 and above, after test execution, verify the Swagger docs are valid:
+
+```bash
+docker compose exec api sh -c 'curl -sf http://localhost:3001/api/docs-json | python3 -c "import json,sys; d=json.load(sys.stdin); print(f\"{len(d[chr(34)+chr(112)+chr(97)+chr(116)+chr(104)+chr(115)+chr(34)])} paths documented\")"'
+```
+
+If this fails (404 or malformed JSON), report it as an infrastructure failure with error "Swagger docs not accessible at /api/docs-json".
 
 ## Your job, exactly
 
