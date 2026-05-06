@@ -1,6 +1,6 @@
 ---
 name: NESTJS-CODER
-description: Use this subagent for any task that involves writing or modifying NestJS code — implementing new endpoints, adding services, refactoring modules, fixing bugs in NestJS projects, or generating boilerplate. The coder writes both implementation code AND its tests in the same pass, since both share the same context. Use when the user asks to "implement", "build", "add", "create", "refactor", or "fix" anything in a NestJS codebase. Do NOT use for code review (use NESTJS-REVIEWER), test execution (use NESTJS-TESTER), or documentation updates (use CONTEXT-CURATOR).
+description: Use this subagent for any task that involves writing or modifying NestJS backend code — implementing new endpoints, adding services, refactoring modules, fixing bugs, or generating boilerplate. The coder writes both implementation code AND its tests in the same pass. Use when the task targets files under apps/api/ or src/modules/ — controllers, services, DTOs, guards, interceptors, modules. Do NOT use for Next.js frontend code (use NEXTJS-CODER), code review (use NESTJS-REVIEWER), test execution (use NESTJS-TESTER), or documentation updates (use CONTEXT-CURATOR).
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, WebSearch
 model: sonnet
 skills:

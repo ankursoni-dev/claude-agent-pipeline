@@ -29,6 +29,8 @@ BLOCKED_PATTERNS = [
      "node_modules/ is a build artifact and must not be edited."),
     (re.compile(r"(^|/)dist/"),
      "dist/ is a build artifact. Edit source under src/ and rebuild."),
+    (re.compile(r"(^|/)\.next/"),
+     ".next/ is a Next.js build artifact. Edit source under src/ and rebuild."),
     (re.compile(r"(^|/)\.claude/settings\.json$"),
      "Editing .claude/settings.json (hook config) requires explicit user approval — these are project security policies."),
 ]

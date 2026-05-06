@@ -10,9 +10,13 @@ Run each step below. If any step fails, report the error and continue with the r
 
 ## Step 1 — Validate project
 
-1. Check that `package.json` exists and contains `@nestjs/core`. If not, warn the user: "This doesn't look like a NestJS project. The pipeline is designed for NestJS — some features may not work correctly. Continue anyway?"
-2. Detect the NestJS version from `package.json` and note it.
-3. Check that `.claude/agents/`, `.claude/hooks/`, `.claude/skills/nestjs/` all exist. If any are missing, the install may be incomplete — tell the user to re-run the install script.
+1. Detect project type:
+   - If `pnpm-workspace.yaml` or `turbo.json` exists: **monorepo**. Check for `apps/api/package.json` (NestJS) and `apps/web/package.json` (Next.js).
+   - If `package.json` contains `@nestjs/core`: **standalone NestJS**.
+   - If `package.json` contains `next`: **standalone Next.js**.
+   - If none match, warn: "This project doesn't appear to use NestJS or Next.js. The pipeline is designed for these frameworks — some features may not work correctly. Continue anyway?"
+2. Detect framework versions from the relevant `package.json` files and note them.
+3. Check that `.claude/agents/`, `.claude/hooks/`, `.claude/skills/nestjs/`, `.claude/skills/nextjs/` all exist. If any are missing, the install may be incomplete — tell the user to re-run the install script.
 
 ## Step 2 — Verify hooks are executable
 
@@ -114,21 +118,24 @@ Check that `.gitignore` includes these entries. Add any that are missing:
 Report the final state:
 
 ```
-NestJS Agent Pipeline — Setup Complete
+Agent Pipeline — Setup Complete
 
 Project: <project name from package.json>
-NestJS:  v<version>
+Type:    <monorepo | standalone NestJS | standalone Next.js>
+NestJS:  v<version> (or "not detected")
+Next.js: v<version> (or "not detected")
 Branch:  <current git branch or "not a git repo">
 
 Pipeline status:
-  Agents:     ✓ 6 agents configured (CODER, REVIEWER, TESTER, CURATOR, MASTER, AUDITOR)
+  Agents:     ✓ 9 agents configured (NestJS: CODER/REVIEWER/TESTER, Next.js: CODER/REVIEWER/TESTER, CURATOR, MASTER, AUDITOR)
   Hooks:      ✓ <N> hooks active
   Skills:     ✓ NestJS skill loaded (SKILL.md, LLD.md, API-DESIGN.md, CLI.md, REVIEWER-CHECKLIST.md)
+              ✓ Next.js skill loaded (SKILL.md, LLD.md, COMPONENT-DESIGN.md, REVIEWER-CHECKLIST.md)
   Repowise:   ✓ configured / ✗ skipped
   Git data:   ✓ hotspots generated / ✗ no git history
 
 How to use:
-  - Just describe what you want to build — the pipeline routes automatically
+  - Just describe what you want to build — the pipeline auto-detects NestJS vs Next.js
   - /QUICK <task>  — fast-path for small changes
   - /AUDIT [scope] — full codebase audit
   - /MASTER <task> — for hard problems that need deep reasoning

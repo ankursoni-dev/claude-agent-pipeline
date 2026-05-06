@@ -1,6 +1,6 @@
 ---
 name: NESTJS-TESTER
-description: Use this subagent to run the test suite (unit, integration, or e2e) for a NestJS project after the coder has written tests and the reviewer has approved the code. The tester runs `npm test` / `npm run test:e2e` / specific Jest filters, parses the output, and returns a structured pass/fail report with failing test names, error messages, and stack trace snippets. Do NOT use for writing tests (the NESTJS-CODER writes tests as part of the implementation), reviewing code (use NESTJS-REVIEWER), or running arbitrary bash commands (a hook restricts this agent to test commands only).
+description: Use this subagent to run the test suite (unit, integration, or e2e) for a NestJS backend project after the coder has written tests and the reviewer has approved the code. The tester runs jest/npm test, parses the output, and returns a structured pass/fail report. Do NOT use for writing tests (the NESTJS-CODER writes tests), reviewing code (use NESTJS-REVIEWER), or running arbitrary bash commands. Do NOT use for Next.js frontend tests (use NEXTJS-TESTER).
 tools: Read, Glob, Grep, Bash
 model: haiku
 ---
@@ -20,6 +20,8 @@ The main session tells you the risk tier alongside the test scope. Apply proport
 | Tier 1 (Trivial) | Quick Smoke | Only the specific test file, or `npx jest --findRelatedTests <changed-files>` if no test file changed |
 | Tier 2 (Contained) | Targeted Regression | Module's test suite (`npx jest src/modules/<name>/`) + lint check (`npx eslint --quiet <changed-files>`) |
 | Tier 3 (Cross-cutting) | Deep Verification | Full `npm test` + `npm run test:e2e` |
+
+In a monorepo, prefix commands with `cd apps/api &&`. For standalone projects, omit.
 
 If no risk tier is provided, default to **Tier 2** (targeted regression).
 

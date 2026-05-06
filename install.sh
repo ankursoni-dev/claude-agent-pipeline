@@ -43,16 +43,41 @@ if [[ ! -f "package.json" ]]; then
     exit 1
 fi
 
-# Check for NestJS
-if ! grep -q '"@nestjs/core"' package.json 2>/dev/null; then
-    warn "This doesn't look like a NestJS project (@nestjs/core not in package.json)."
+# Check for NestJS or Next.js (standalone or monorepo)
+HAS_NESTJS=""
+HAS_NEXTJS=""
+IS_MONOREPO=""
+
+# Check monorepo apps
+if [[ -f "apps/api/package.json" ]] && grep -q '"@nestjs/core"' apps/api/package.json 2>/dev/null; then
+    HAS_NESTJS="yes"
+    IS_MONOREPO="yes"
+fi
+if [[ -f "apps/web/package.json" ]] && grep -q '"next"' apps/web/package.json 2>/dev/null; then
+    HAS_NEXTJS="yes"
+    IS_MONOREPO="yes"
+fi
+
+# Check root package.json
+if grep -q '"@nestjs/core"' package.json 2>/dev/null; then
+    HAS_NESTJS="yes"
+fi
+if grep -q '"next"' package.json 2>/dev/null; then
+    HAS_NEXTJS="yes"
+fi
+
+if [[ -z "$HAS_NESTJS" && -z "$HAS_NEXTJS" ]]; then
+    warn "This project doesn't appear to use NestJS or Next.js."
     read -rp "    Continue anyway? [y/N] " yn
     [[ "$yn" =~ ^[Yy] ]] || exit 0
 fi
 
 echo ""
-echo -e "${GREEN}NestJS Agent Pipeline Installer${NC}"
+echo -e "${GREEN}Agent Pipeline Installer${NC}"
 echo "─────────────────────────────────────────"
+[[ -n "$IS_MONOREPO" ]] && info "Detected monorepo structure"
+[[ -n "$HAS_NESTJS" ]] && info "NestJS detected"
+[[ -n "$HAS_NEXTJS" ]] && info "Next.js detected"
 echo ""
 
 # ── Backup existing .claude/ ────────────────────────────────

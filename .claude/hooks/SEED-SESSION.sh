@@ -9,10 +9,34 @@ set -euo pipefail
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 CONTEXT_FILE="$PROJECT_DIR/.claude/context/CONTEXT.md"
 
-# Detect NestJS version from package.json so agents don't guess
+# Detect monorepo structure
+IS_MONOREPO=""
+WORKSPACE_TOOL=""
+if [[ -f "$PROJECT_DIR/pnpm-workspace.yaml" ]]; then
+  IS_MONOREPO="yes"
+  WORKSPACE_TOOL="pnpm"
+elif [[ -f "$PROJECT_DIR/turbo.json" ]]; then
+  IS_MONOREPO="yes"
+  WORKSPACE_TOOL="turborepo"
+fi
+
+# Detect NestJS version (check apps/api/ first for monorepo, then root)
 NEST_VERSION=""
-if [[ -f "$PROJECT_DIR/package.json" ]]; then
+if [[ -f "$PROJECT_DIR/apps/api/package.json" ]]; then
+  NEST_VERSION=$(grep -oE '"@nestjs/core":[[:space:]]*"[^"]+"' "$PROJECT_DIR/apps/api/package.json" 2>/dev/null \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+elif [[ -f "$PROJECT_DIR/package.json" ]]; then
   NEST_VERSION=$(grep -oE '"@nestjs/core":[[:space:]]*"[^"]+"' "$PROJECT_DIR/package.json" 2>/dev/null \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+fi
+
+# Detect Next.js version
+NEXT_VERSION=""
+if [[ -f "$PROJECT_DIR/apps/web/package.json" ]]; then
+  NEXT_VERSION=$(grep -oE '"next":[[:space:]]*"[^"]+"' "$PROJECT_DIR/apps/web/package.json" 2>/dev/null \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+elif [[ -f "$PROJECT_DIR/package.json" ]]; then
+  NEXT_VERSION=$(grep -oE '"next":[[:space:]]*"[^"]+"' "$PROJECT_DIR/package.json" 2>/dev/null \
     | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
 fi
 
@@ -48,15 +72,26 @@ fi
 
 cat <<EOF
 <session_orientation>
-Project type: NestJS backend service
-${NEST_VERSION:+NestJS version (from package.json): $NEST_VERSION}
+${IS_MONOREPO:+Project type: Monorepo ($WORKSPACE_TOOL)
+  apps/api/  — NestJS backend
+  apps/web/  — Next.js frontend
+  packages/  — Shared code}
+${IS_MONOREPO:-Project type: NestJS backend service}
+${NEST_VERSION:+NestJS version: $NEST_VERSION}
+${NEXT_VERSION:+Next.js version: $NEXT_VERSION}
 ${BRANCH:+Current branch: $BRANCH}
 
 Available subagents:
-  - NESTJS-CODER: writes NestJS code AND tests (sonnet)
-  - NESTJS-REVIEWER: read-only structural review, returns JSON verdict (sonnet)
-  - NESTJS-TESTER: runs tests with verification ladder, returns JSON pass/fail (haiku)
-  - CONTEXT-CURATOR: writes wiki to .claude/context/ (haiku)
+  NestJS pipeline (apps/api/):
+    - NESTJS-CODER: writes NestJS code + tests (sonnet)
+    - NESTJS-REVIEWER: read-only structural review, NestJS checklist (sonnet)
+    - NESTJS-TESTER: runs backend tests, verification ladder (haiku)
+  Next.js pipeline (apps/web/):
+    - NEXTJS-CODER: writes Next.js code + tests (sonnet)
+    - NEXTJS-REVIEWER: read-only structural review, Next.js checklist (sonnet)
+    - NEXTJS-TESTER: runs frontend tests + build checks (haiku)
+  Shared:
+    - CONTEXT-CURATOR: writes wiki to .claude/context/ (haiku)
 
 Standard flow: coder -> typecheck/lint gate -> reviewer -> tester (risk-proportional) -> curator.
 Reject early; tests are expensive.
@@ -64,7 +99,7 @@ Reject early; tests are expensive.
 Risk classification: <risk_tier> tag is injected per prompt (1=trivial, 2=contained, 3=cross-cutting).
   Tier 1 → /QUICK flow. Tier 2 → standard (skip curator unless public API changed). Tier 3 → full pipeline.
 
-The 'nestjs' skill is preloaded for coder; condensed REVIEWER-CHECKLIST.md for reviewer.
+Each agent loads its framework-specific skill (nestjs or nextjs). Route to the right pipeline based on file paths.
 Project conventions and per-module wikis are in .claude/context/.
 ${REPOWISE_STATUS:+
 Repowise MCP: $REPOWISE_STATUS

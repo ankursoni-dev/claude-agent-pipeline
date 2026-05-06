@@ -4,15 +4,44 @@ This file tells the **main session** how to coordinate the subagents in this pro
 
 ---
 
+## Monorepo awareness
+
+This pipeline supports monorepo projects with multiple frameworks. The coder and reviewer auto-detect the framework from file paths:
+
+| Path pattern | Framework | Skill set |
+|---|---|---|
+| `apps/api/`, `src/modules/` | NestJS | `nestjs` (LLD.md, API-DESIGN.md, CLI.md) |
+| `apps/web/`, `src/app/`, `src/components/` | Next.js | `nextjs` (LLD.md, COMPONENT-DESIGN.md) |
+| `packages/` | Shared | TypeScript best practices |
+
+When delegating to the coder, include which part of the monorepo the task targets. For cross-stack tasks (e.g., "add a users page that calls the users API"), split into separate delegations or let the coder handle both in sequence.
+
+### Typecheck/lint gates in monorepo
+
+For NestJS code: `cd apps/api && npx tsc --noEmit --pretty 2>&1 | head -30`
+For Next.js code: `cd apps/web && npx next build --dry-run 2>&1 | head -30` (or `npx tsc --noEmit`)
+For shared packages: `cd packages/<name> && npx tsc --noEmit`
+
+---
+
 ## The agent roster
 
-### Standard pipeline (run on every regular feature)
+### Standard pipeline — NestJS (apps/api/)
 
 | Agent | Model | Tools | Job |
 |---|---|---|---|
-| `NESTJS-CODER` | sonnet | full | writes code AND tests |
-| `NESTJS-REVIEWER` | sonnet | read-only | JSON verdict (condensed checklist) |
-| `NESTJS-TESTER` | haiku | bash whitelisted | runs tests (verification ladder) |
+| `NESTJS-CODER` | sonnet | full | writes NestJS code AND tests |
+| `NESTJS-REVIEWER` | sonnet | read-only | JSON verdict (NestJS checklist) |
+| `NESTJS-TESTER` | haiku | bash whitelisted | runs backend tests (verification ladder) |
+| `CONTEXT-CURATOR` | haiku | writes confined to `.claude/context/` | updates wikis |
+
+### Standard pipeline — Next.js (apps/web/)
+
+| Agent | Model | Tools | Job |
+|---|---|---|---|
+| `NEXTJS-CODER` | sonnet | full | writes Next.js code AND tests |
+| `NEXTJS-REVIEWER` | sonnet | read-only | JSON verdict (Next.js checklist) |
+| `NEXTJS-TESTER` | haiku | bash whitelisted | runs frontend tests + build checks |
 | `CONTEXT-CURATOR` | haiku | writes confined to `.claude/context/` | updates wikis |
 
 ### Specialist agents (invoked deliberately, never automatically)
@@ -68,29 +97,40 @@ If Repowise MCP is available, you can call `get_risk()` on the affected files fo
 
 ## The standard flow (default for any "implement X" prompt)
 
+### Framework routing
+
+Before delegating, determine the target framework from the task description and file paths:
+- **NestJS tasks** (controllers, services, DTOs, guards, modules, `apps/api/`): use `NESTJS-CODER`, `NESTJS-REVIEWER`, `NESTJS-TESTER`
+- **Next.js tasks** (pages, components, layouts, actions, route handlers, `apps/web/`): use `NEXTJS-CODER`, `NEXTJS-REVIEWER`, `NEXTJS-TESTER`
+- **Cross-stack tasks**: split into two sequential delegations — backend first (NestJS agents), then frontend (Next.js agents)
+- **Shared packages** (`packages/`): use whichever agent set is closer to the change (e.g., shared types used by the API → NestJS agents)
+
+The examples below use `{CODER}`, `{REVIEWER}`, `{TESTER}` as placeholders for the framework-appropriate agent.
+
 ```
 User prompt
   ↓ CLASSIFY-RISK.py hook: injects <risk_tier> tag
   ↓ ENRICH-PROMPT.py hook: injects relevant context wikis + dependency wikis
 Main session (you)
   ↓ Read risk tier. Route Tier 1 to /QUICK.
+  ↓ Determine target framework from task + file paths.
   ↓ Build context passport (see below).
-  ↓ delegate: "Use NESTJS-CODER to implement <task>"
-NESTJS-CODER
+  ↓ delegate: "Use {CODER} to implement <task>"
+{CODER}
   ↓ returns: file list + summary + tests added
 Main session
-  ↓ TYPECHECK GATE: run `npx tsc --noEmit --pretty 2>&1 | head -30`
+  ↓ TYPECHECK GATE: run in the appropriate app directory (see "Monorepo awareness" above)
   ↓ LINT GATE: run `npx eslint --quiet <changed-files> 2>&1 | head -20`
   ↓ if errors: return to CODER (does NOT count toward reviewer loop budget)
   ↓ if clean: build explicit file list from coder output
-  ↓ delegate: "Use NESTJS-REVIEWER to review files: [explicit list]"
-NESTJS-REVIEWER
+  ↓ delegate: "Use {REVIEWER} to review files: [explicit list]"
+{REVIEWER}
   ↓ returns JSON: { verdict, issues[], summary }
-  ↓ if rejected: loop back to NESTJS-CODER with the issues array
+  ↓ if rejected: loop back to {CODER} with the issues array
   ↓ if approved: continue
 Main session
-  ↓ delegate: "Use NESTJS-TESTER to run tests for <scope> at <risk tier>"
-NESTJS-TESTER (verification ladder — depth matches risk tier)
+  ↓ delegate: "Use {TESTER} to run tests for <scope> at <risk tier>"
+{TESTER} (verification ladder — depth matches risk tier)
   ↓ returns JSON: { passed, summary, failures[] }
   ↓ if failed: loop back to NESTJS-CODER with the failures array
   ↓ if passed: continue
@@ -125,6 +165,7 @@ After the coder returns, build the passport:
 ```markdown
 ## Context Passport
 **Risk tier**: <1|2|3>
+**Framework**: <nestjs|nextjs|shared|cross-stack>
 **Changed files**:
 - <file path> (<new|modified>, ~N lines)
 

@@ -31,7 +31,11 @@ TIER_3_PATTERNS = re.compile(
     r"integrat(e|ion)|new\s+service|add\s+service|create\s+service|"
     r"stripe|payment|auth(entication|orization)?|database|"
     r"add\s+dependency|upgrade|websocket|queue|event|cron|schedule|"
-    r"middleware|interceptor|guard|filter|pipe)\b",
+    r"middleware|interceptor|guard|filter|pipe|"
+    # Next.js cross-cutting
+    r"new\s+page|add\s+page|create\s+page|new\s+route|"
+    r"server\s+action|route\s+handler|layout|"
+    r"new\s+component|add\s+component|create\s+component)\b",
     re.IGNORECASE,
 )
 
@@ -39,7 +43,10 @@ TIER_3_PATTERNS = re.compile(
 CODE_KEYWORDS = re.compile(
     r"\b(fix|add|update|modify|implement|refactor|bug|feature|"
     r"endpoint|service|module|config|build|create|remove|delete|"
-    r"rename|controller|dto|guard|pipe|filter|interceptor)\b",
+    r"rename|controller|dto|guard|pipe|filter|interceptor|"
+    # Next.js keywords
+    r"page|component|layout|route|action|hook|nextjs|next\.js|"
+    r"server\s+component|client\s+component|app\s+router)\b",
     re.IGNORECASE,
 )
 

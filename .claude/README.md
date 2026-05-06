@@ -1,6 +1,6 @@
-# NestJS Agent Pipeline
+# Agent Pipeline
 
-A multi-agent Claude Code architecture specialized for NestJS backend development. Drop this `.claude/` directory into any NestJS project and Claude Code picks it up automatically.
+A multi-agent Claude Code architecture for NestJS and Next.js development. Supports standalone projects and monorepos. Drop this `.claude/` directory into any NestJS or Next.js project and Claude Code picks it up automatically.
 
 ## Quick Install
 
@@ -27,6 +27,8 @@ Main session (orchestrator)
   ├─ Tier 1 ──► /QUICK flow (coder → typecheck gate → reviewer → conditional tests)
   ├─ Tier 2 ──► Standard flow (coder → typecheck/lint gate → reviewer → targeted tests → conditional curator)
   ├─ Tier 3 ──► Full pipeline (coder → gates → reviewer → deep tests → curator → wiki review)
+  │
+  Coder auto-detects NestJS vs Next.js from file paths and loads the correct skill set.
   ├─ /MASTER ─► MASTER (opus) → delegation requests → user approval
   └─ /AUDIT ──► AUDITOR (opus) → plan → user approval → execute via standard pipeline → reports
 ```
@@ -35,12 +37,15 @@ Main session (orchestrator)
 
 | Agent | Model | Job |
 |---|---|---|
-| `NESTJS-CODER` | sonnet | Writes code + tests. Returns structured summary with file list and wiki ingredients. |
-| `NESTJS-REVIEWER` | sonnet | Read-only structural review. Returns JSON verdict. Uses condensed REVIEWER-CHECKLIST. |
-| `NESTJS-TESTER` | haiku | Runs tests at risk-proportional depth (Quick Smoke / Targeted / Deep). Returns JSON. |
+| `NESTJS-CODER` | sonnet | Writes NestJS backend code + tests. Uses `nestjs` skill. |
+| `NESTJS-REVIEWER` | sonnet | Read-only NestJS review. JSON verdict with NestJS checklist. |
+| `NESTJS-TESTER` | haiku | Runs backend tests (Quick Smoke / Targeted / Deep). Returns JSON. |
+| `NEXTJS-CODER` | sonnet | Writes Next.js frontend code + tests. Uses `nextjs` skill. |
+| `NEXTJS-REVIEWER` | sonnet | Read-only Next.js review. JSON verdict with Next.js checklist. |
+| `NEXTJS-TESTER` | haiku | Runs frontend tests + build checks. Returns JSON. |
 | `CONTEXT-CURATOR` | haiku | Updates `.claude/context/` module wikis. Writes confined by hook. |
-| `MASTER` | opus | Hard problems, design decisions, stalled loops. Can request delegation. Used sparingly. |
-| `AUDITOR` | opus | End-to-end audit. Delegates Phase 1 reviews to sonnet. Plans + reports only; doesn't execute. |
+| `MASTER` | opus | Hard problems, design decisions, stalled loops. Can request delegation. |
+| `AUDITOR` | opus | End-to-end audit. Delegates Phase 1 reviews to sonnet. Plans + reports only. |
 
 ### Slash commands
 
@@ -68,9 +73,12 @@ Main session (orchestrator)
 ├── README.md                          # This file
 │
 ├── agents/
-│   ├── NESTJS-CODER.md                # sonnet — writes code + tests
-│   ├── NESTJS-REVIEWER.md             # sonnet — read-only JSON verdict (condensed checklist)
-│   ├── NESTJS-TESTER.md               # haiku — verification ladder (Quick/Targeted/Deep)
+│   ├── NESTJS-CODER.md                # sonnet — writes NestJS backend code + tests
+│   ├── NESTJS-REVIEWER.md             # sonnet — NestJS read-only review
+│   ├── NESTJS-TESTER.md               # haiku — backend verification ladder
+│   ├── NEXTJS-CODER.md                # sonnet — writes Next.js frontend code + tests
+│   ├── NEXTJS-REVIEWER.md             # sonnet — Next.js read-only review
+│   ├── NEXTJS-TESTER.md               # haiku — frontend tests + build checks
 │   ├── CONTEXT-CURATOR.md             # haiku — wiki updates confined to .claude/context/
 │   ├── MASTER.md                      # opus — generalist for tough problems
 │   └── AUDITOR.md                     # opus — audit planner + reporter
@@ -82,12 +90,17 @@ Main session (orchestrator)
 │   └── AUDIT.md                       # /AUDIT — full audit with incremental support
 │
 ├── skills/
-│   └── nestjs/
-│       ├── SKILL.md                   # Router + universal defaults
-│       ├── LLD.md                     # SOLID, DRY, transactions, resilience, tests
-│       ├── API-DESIGN.md              # HTTP method, route, status, envelope, pagination
-│       ├── CLI.md                     # nest g, nest new, monorepo
-│       └── REVIEWER-CHECKLIST.md      # Condensed 80-line checklist for reviewer
+│   ├── nestjs/
+│   │   ├── SKILL.md                   # Router + universal defaults
+│   │   ├── LLD.md                     # SOLID, DRY, transactions, resilience, tests
+│   │   ├── API-DESIGN.md              # HTTP method, route, status, envelope, pagination
+│   │   ├── CLI.md                     # nest g, nest new, monorepo
+│   │   └── REVIEWER-CHECKLIST.md      # Condensed NestJS checklist for reviewer
+│   └── nextjs/
+│       ├── SKILL.md                   # App Router conventions, layer responsibilities
+│       ├── LLD.md                     # Server/Client Components, data fetching, caching
+│       ├── COMPONENT-DESIGN.md        # Composition patterns, forms, state management
+│       └── REVIEWER-CHECKLIST.md      # Condensed Next.js checklist for reviewer
 │
 ├── hooks/
 │   ├── SEED-SESSION.sh                # SessionStart — project orientation + Repowise status
@@ -120,7 +133,7 @@ Setup: run `/INIT` inside Claude Code, or see `REPOWISE-INTEGRATION.md`.
 
 ## Customizing
 
-- **Add a new skill**: Drop it in `.claude/skills/<name>/SKILL.md`. Reference from agent frontmatter `skills:`.
+- **Add a new framework skill**: Drop it in `.claude/skills/<framework>/SKILL.md`. Reference from agent frontmatter `skills:`. Update the coder's framework detection section.
 - **Change model assignments**: Edit the `model:` field in agent frontmatter. The cost-quality tradeoff is yours.
 - **Add a new hook**: Add to `.claude/hooks/` and wire in `settings.json`.
 - **Adjust risk tiers**: Edit keyword patterns in `.claude/hooks/CLASSIFY-RISK.py`.

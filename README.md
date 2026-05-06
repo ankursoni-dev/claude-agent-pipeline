@@ -1,8 +1,8 @@
-# NestJS Agent Pipeline for Claude Code
+# Agent Pipeline for Claude Code
 
-A production-grade multi-agent system that turns Claude Code into an opinionated NestJS development team. Six specialized agents handle code generation, structural review, testing, documentation, architectural decisions, and full codebase audits — each with enforced tool restrictions, model-appropriate assignments, and structured handoff contracts.
+A production-grade multi-agent system that turns Claude Code into an opinionated development team for NestJS and Next.js. Nine specialized agents handle code generation, structural review, testing, documentation, architectural decisions, and full codebase audits — each with enforced tool restrictions, model-appropriate assignments, and structured handoff contracts.
 
-Built for NestJS. Optimized for token efficiency. Works with any NestJS project.
+Built for NestJS + Next.js. Supports monorepos. Optimized for token efficiency.
 
 ---
 
@@ -39,15 +39,16 @@ CLASSIFY-RISK.py            (keyword heuristics, zero LLM cost)
 ENRICH-PROMPT.py            (deterministic wiki injection, zero LLM cost)
    | injects module wikis      direct match + dependency walking
    v
-Main session reads tier, routes to the right flow
+Main session reads tier + detects framework, routes to the right agent set
 ```
 
-The risk tier determines how much pipeline the task gets:
+The risk tier determines how much pipeline the task gets. The framework determines which agents run:
 
 ```
-Tier 1 -----> /QUICK flow (coder + typecheck gate + reviewer)
-Tier 2 -----> Standard flow (coder + gates + reviewer + targeted tests)
-Tier 3 -----> Full pipeline (coder + gates + reviewer + deep tests + curator)
+                          NestJS (apps/api/)              Next.js (apps/web/)
+Tier 1 -----> /QUICK flow (NESTJS-CODER + gate + rev)    (NEXTJS-CODER + gate + rev)
+Tier 2 -----> Standard    (coder + gates + rev + tests)   (coder + gates + rev + tests)
+Tier 3 -----> Full        (coder + gates + rev + tests + curator)
 ```
 
 ---
@@ -120,12 +121,15 @@ Every delegation proves the main session understood the upstream output. No vagu
 
 | Agent | Model | Tools | What It Does |
 |-------|-------|-------|-------------|
-| NESTJS-CODER | sonnet | full | Writes implementation code AND tests in one pass. Conforms to the NestJS skill (SOLID, DRY, API contracts). Returns structured summary with file list and wiki ingredients. |
-| NESTJS-REVIEWER | sonnet | read-only | Structural review against a condensed 80-line checklist. Returns JSON verdict with file:line references. Cannot modify files (enforced by tool whitelist). Supports audit mode. |
-| NESTJS-TESTER | haiku | bash (whitelisted) | Runs tests at risk-proportional depth. Returns JSON with pass/fail, failure details, and duration. Cannot modify code (enforced by hook). |
-| CONTEXT-CURATOR | haiku | write-confined | Updates module wikis under `.claude/context/`. Cannot write anywhere else (enforced by hook). Produces concise, factual documentation. |
-| MASTER | opus | full | Deep reasoning for hard problems: architecture decisions, cross-module debugging, stalled pipeline rescue. Can request delegation to other agents (user approves each). |
-| AUDITOR | opus | full | End-to-end codebase audit. Delegates Phase 1 reviews to sonnet reviewer. Produces plan for human approval. Does NOT execute code changes. |
+| NESTJS-CODER | sonnet | full | Writes NestJS backend code AND tests. Uses the `nestjs` skill set. |
+| NESTJS-REVIEWER | sonnet | read-only | Structural review against NestJS checklist. JSON verdict with file:line references. |
+| NESTJS-TESTER | haiku | bash (whitelisted) | Runs backend tests at risk-proportional depth. JSON pass/fail report. |
+| NEXTJS-CODER | sonnet | full | Writes Next.js frontend code AND tests. Uses the `nextjs` skill set. |
+| NEXTJS-REVIEWER | sonnet | read-only | Structural review against Next.js checklist (server/client boundary, data fetching, performance). |
+| NEXTJS-TESTER | haiku | bash (whitelisted) | Runs frontend tests + build checks. JSON pass/fail report. |
+| CONTEXT-CURATOR | haiku | write-confined | Updates module wikis under `.claude/context/`. Cannot write anywhere else (enforced by hook). |
+| MASTER | opus | full | Deep reasoning for hard problems: architecture decisions, cross-module debugging, stalled pipeline rescue. |
+| AUDITOR | opus | full | End-to-end codebase audit. Delegates Phase 1 reviews to sonnet reviewers. Produces plan for human approval. |
 
 ### Tool restrictions enforced by hooks
 
@@ -208,17 +212,24 @@ Eight hooks fire automatically at different lifecycle points. All are determinis
 
 ---
 
-## NestJS Skill System
+## Skill System
 
-The pipeline includes a comprehensive NestJS reference that agents consult:
+The pipeline includes comprehensive framework-specific references that agents consult. The coder auto-detects NestJS vs Next.js from file paths and loads the correct skill set. The reviewer loads only the condensed checklist for the relevant framework.
+
+### NestJS Skills (`skills/nestjs/`)
 
 - **SKILL.md** — Universal defaults: ValidationPipe config, layer responsibilities, response envelope shape, project layout
 - **LLD.md** — Low-level design: SOLID principles, error handling, transactions, resilience, test discipline (16 sections)
 - **API-DESIGN.md** — Endpoint contracts: HTTP methods, route shapes, status codes, pagination, idempotency, file uploads
 - **CLI.md** — Scaffolding: `nest g resource`, `nest new`, monorepo setup
-- **REVIEWER-CHECKLIST.md** — Condensed 80-line checklist extracted from LLD.md for the reviewer (saves ~700 lines of context per review)
+- **REVIEWER-CHECKLIST.md** — Condensed checklist extracted from LLD.md for the reviewer
 
-The coder loads the full skill. The reviewer loads only the condensed checklist. This is deliberate — the reviewer doesn't need CLI scaffolding docs or SOLID code examples, just the rules to check against.
+### Next.js Skills (`skills/nextjs/`)
+
+- **SKILL.md** — Universal defaults: App Router file conventions, layer responsibilities (Server vs Client Components), project layout, response patterns
+- **LLD.md** — Low-level design: Server/Client Component decision rules, data fetching hierarchy, Server Actions, Route Handlers, error handling, caching, middleware, testing (13 sections)
+- **COMPONENT-DESIGN.md** — Component patterns: composition (server parent/client leaf), form handling with useActionState, state management hierarchy, loading/streaming patterns, error boundaries, shared component rules
+- **REVIEWER-CHECKLIST.md** — Condensed checklist for Next.js code review (Server/Client boundary, data fetching, performance, accessibility)
 
 ---
 
@@ -257,9 +268,12 @@ The pipeline is designed to minimize Claude token usage at every step:
   REPOWISE-INTEGRATION.md     Repowise setup guide
 
   agents/
-    NESTJS-CODER.md            sonnet -- writes code + tests
-    NESTJS-REVIEWER.md         sonnet -- read-only JSON verdict
-    NESTJS-TESTER.md           haiku  -- verification ladder
+    NESTJS-CODER.md            sonnet -- writes NestJS code + tests
+    NESTJS-REVIEWER.md         sonnet -- NestJS read-only review
+    NESTJS-TESTER.md           haiku  -- backend verification ladder
+    NEXTJS-CODER.md            sonnet -- writes Next.js code + tests
+    NEXTJS-REVIEWER.md         sonnet -- Next.js read-only review
+    NEXTJS-TESTER.md           haiku  -- frontend tests + build checks
     CONTEXT-CURATOR.md         haiku  -- wiki updates
     MASTER.md                  opus   -- hard problems
     AUDITOR.md                 opus   -- audit planner + reporter
@@ -270,12 +284,18 @@ The pipeline is designed to minimize Claude token usage at every step:
     MASTER.md                  /MASTER -- opus invocation
     AUDIT.md                   /AUDIT -- full audit
 
-  skills/nestjs/
-    SKILL.md                   Router + universal defaults
-    LLD.md                     SOLID, DRY, transactions, resilience, tests
-    API-DESIGN.md              HTTP contracts, envelope, pagination
-    CLI.md                     Scaffolding, monorepo
-    REVIEWER-CHECKLIST.md      Condensed 80-line checklist
+  skills/
+    nestjs/
+      SKILL.md                 Router + universal defaults
+      LLD.md                   SOLID, DRY, transactions, resilience, tests
+      API-DESIGN.md            HTTP contracts, envelope, pagination
+      CLI.md                   Scaffolding, monorepo
+      REVIEWER-CHECKLIST.md    Condensed NestJS checklist
+    nextjs/
+      SKILL.md                 App Router conventions, layer responsibilities
+      LLD.md                   Server/Client Components, data fetching, actions, caching
+      COMPONENT-DESIGN.md      Composition patterns, forms, state management
+      REVIEWER-CHECKLIST.md    Condensed Next.js checklist
 
   hooks/
     SEED-SESSION.sh            Session orientation

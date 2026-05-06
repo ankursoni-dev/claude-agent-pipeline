@@ -29,7 +29,11 @@ MAX_INJECTED_BYTES = 8000  # cap to avoid blowing up the prompt
 CODE_KEYWORDS = re.compile(
     r"\b(implement|build|add|create|fix|refactor|review|test|endpoint|service|"
     r"controller|module|dto|guard|interceptor|pipe|filter|transaction|migration|"
-    r"nestjs|nest|typescript|repository|inject)\b",
+    r"nestjs|nest|typescript|repository|inject|"
+    # Next.js keywords
+    r"page|component|layout|route|action|hook|nextjs|next\.js|"
+    r"server\s+component|client\s+component|app\s+router|"
+    r"server\s+action|middleware|form|dashboard|api)\b",
     re.IGNORECASE,
 )
 
